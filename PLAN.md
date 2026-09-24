@@ -12,7 +12,8 @@
 - Визуал пока базовый: аккуратная вёрстка на Tailwind, светлая/тёмная тема
   по системе. Красивый стиль — отдельный этап 8 в самом конце
 
-**Где мы сейчас:** этап 0.2 — каркас в GitHub, ждём подключения Cloudflare Pages и Resend (0.1).
+**Где мы сейчас:** 0.1 и 0.2 закрыты — сайт живёт на `fuel.kunitcan.online`.
+Дальше 0.3 (база и авторизация).
 
 ---
 
@@ -30,21 +31,12 @@
       можно, в репо — никогда (они лягут в `.env`/`.dev.vars`, которые в
       `.gitignore`). Оба проекта — Франкфурт (`eu-central-1`); если во
       Вьетнаме поиск по базе будет медленным — переезд в Сингапур
-- [ ] **Resend:** домен `kunitcan.online` уже подтверждён для daylens —
-      новый не нужен. Можно взять тот же API-ключ или выпустить отдельный
-      (API Keys → Create, права Sending access). Отправитель будет
+- [x] **Resend:** отдельный API-ключ выпущен, отправитель
       `Fuel <fuel@kunitcan.online>`
-- [ ] **Cloudflare Pages** — делаем **после 0.2**, когда код уже в GitHub:
-  1. Workers & Pages → Create → Pages → Connect to Git → выбрать репо `fuel`
-  2. Framework preset: None. Build command: `npm run build`.
-     Build output directory: `dist`
-  3. Settings → Variables and Secrets (для Production), все как **Secret**:
-     `DATABASE_URL`, `CATALOG_DATABASE_URL`, `SESSION_SECRET` (сгенерирую
-     и пришлю), `RESEND_API_KEY`, `LOGIN_EMAIL_FROM`, `APP_URL` =
-     `https://fuel.kunitcan.online`
-  4. Custom domains → Set up a custom domain → `fuel.kunitcan.online`.
-     Домен уже в Cloudflare, поэтому CNAME создастся сам
-  5. Retry deployment, чтобы подхватились переменные
+- [x] **Cloudflare Pages:** проект подключён к `fuel`, build/output настроены,
+      секреты (`DATABASE_URL`, `CATALOG_DATABASE_URL`, `SESSION_SECRET`,
+      `RESEND_API_KEY`, `LOGIN_EMAIL_FROM`, `APP_URL`) и `NODE_VERSION`
+      заданы, домен `fuel.kunitcan.online` подключён и отвечает 200
 
 ### 0.2 Проект и сборка
 
@@ -60,7 +52,11 @@
       `.env.example`
 - [x] Каркас экранов: таб-бар (Дневник │ Статистика │ Настройки), пустые
       экраны
-- [~] Первый коммит, пуш в GitHub → 👤 подключить Cloudflare Pages (0.1)
+- [x] Первый коммит, пуш в GitHub → 👤 подключить Cloudflare Pages (0.1)
+
+**Проверка этапа 0.1–0.2:**
+- [x] `fuel.kunitcan.online` открывается (200), собранный манифест отдаётся
+- [x] Тёмная тема системы подхватывается на живом сайте
 
 ### 0.3 Бэкенд: база и авторизация
 
