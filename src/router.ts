@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DiaryView from './views/DiaryView.vue'
+import LoginView from './views/LoginView.vue'
 import SettingsView from './views/SettingsView.vue'
 import StatsView from './views/StatsView.vue'
 
@@ -16,5 +17,7 @@ export const router = createRouter({
     { path: '/', name: 'diary', component: DiaryView, meta: { tabBar: true } },
     { path: '/stats', name: 'stats', component: StatsView, meta: { tabBar: true } },
     { path: '/settings', name: 'settings', component: SettingsView, meta: { tabBar: true } },
+    // не требует сессии для показа — сам логин, страница обязана быть публичной
+    { path: '/login', name: 'login', component: LoginView },
   ],
 })

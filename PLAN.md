@@ -12,8 +12,9 @@
 - Визуал пока базовый: аккуратная вёрстка на Tailwind, светлая/тёмная тема
   по системе. Красивый стиль — отдельный этап 8 в самом конце
 
-**Где мы сейчас:** 0.1 и 0.2 закрыты — сайт живёт на `fuel.kunitcan.online`.
-Дальше 0.3 (база и авторизация).
+**Где мы сейчас:** 0.1–0.3 сделаны и проверены локально (вход по коду
+работает целиком). Осталось поправить `LOGIN_EMAIL_FROM` в секретах
+Cloudflare (см. проверку 0.3) — и можно идти в 0.4 (синк).
 
 ---
 
@@ -31,8 +32,11 @@
       можно, в репо — никогда (они лягут в `.env`/`.dev.vars`, которые в
       `.gitignore`). Оба проекта — Франкфурт (`eu-central-1`); если во
       Вьетнаме поиск по базе будет медленным — переезд в Сингапур
-- [x] **Resend:** отдельный API-ключ выпущен, отправитель
-      `Fuel <fuel@kunitcan.online>`
+- [x] **Resend:** отдельный API-ключ выпущен. Отправитель —
+      `Fuel <fuel@hithere.kunitcan.online>`, не корневой `kunitcan.online`:
+      в Resend у этого ключа подтверждён (SPF/DKIM) только поддомен
+      `hithere.kunitcan.online`, письмо с непроверенного домена Resend
+      отклоняет 403-й
 - [x] **Cloudflare Pages:** проект подключён к `fuel`, build/output настроены,
       секреты (`DATABASE_URL`, `CATALOG_DATABASE_URL`, `SESSION_SECRET`,
       `RESEND_API_KEY`, `LOGIN_EMAIL_FROM`, `APP_URL`) и `NODE_VERSION`
@@ -60,15 +64,32 @@
 
 ### 0.3 Бэкенд: база и авторизация
 
-- [ ] `functions/_lib/*` из daylens; в `env.ts` добавить
-      `CATALOG_DATABASE_URL`, в `db.ts` — `getCatalogDb()`
-- [ ] `db/schema.ts` для `fuel`: `users`, `login_codes`,
+- [x] `functions/_lib/*` из daylens; в `env.ts` добавлен
+      `CATALOG_DATABASE_URL`, в `db.ts` — `getCatalogDb()` (пока без схемы,
+      она появится в этапе 2)
+- [x] `db/schema.ts` для `fuel`: `users`, `login_codes`,
       `login_code_requests` (сессия — JWT в куке, таблицы `sessions` нет,
       как в daylens)
-- [ ] `drizzle.config.ts`, первая миграция, накатить на Neon `fuel`
-- [ ] `functions/api/auth/*`, `me.ts`, `health.ts`, `_middleware.ts`
-- [ ] Письмо с кодом: тексты под Fuel
-- [ ] Экран входа (email → код), статус входа/синка в настройках
+- [x] `drizzle.config.ts`, первая миграция, накатана на Neon `fuel`
+- [x] `functions/api/auth/*`, `me.ts`, `health.ts`, `_middleware.ts`
+      (плюс пропуск для будущего `/api/health/workouts` с Bearer-токеном,
+      этап 5)
+- [x] Письмо с кодом: тексты под Fuel
+- [x] Экран входа (email → код, `/login`), статус в настройках —
+      сам синк ещё не подключён (0.4), поэтому пока просто «вошли как …» /
+      «войти по коду»
+
+**Проверка этапа 0.3:**
+- [x] Сборка и `tsc` для `functions/` проходят без ошибок
+- [x] Миграция применена к Neon `fuel` (`users`, `login_codes`,
+      `login_code_requests`)
+- [x] Живой прогон через `wrangler pages dev`: запрос кода → письмо от
+      Fuel дошло → код подтверждён → `/api/me` отдаёт пользователя →
+      повторный/неверный код отклоняется (400) → `logout` гасит сессию
+      (`/api/me` после него — 401)
+- [ ] 👤 Обновить `LOGIN_EMAIL_FROM` в секретах Cloudflare Pages на
+      `Fuel <fuel@hithere.kunitcan.online>` и проверить вход на самом
+      `fuel.kunitcan.online`
 
 ### 0.4 Инфраструктура синка (без сущностей дневника)
 
