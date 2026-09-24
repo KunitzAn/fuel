@@ -1,0 +1,7 @@
+# Копия в .dev.vars — читается `wrangler pages dev` для локального API.
+DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/fuel?sslmode=require"
+CATALOG_DATABASE_URL="postgresql://user:pass@ep-yyy-pooler.region.aws.neon.tech/fuel-catalog?sslmode=require"
+SESSION_SECRET="openssl rand -hex 32"
+RESEND_API_KEY="re_..."
+LOGIN_EMAIL_FROM="Fuel <fuel@kunitcan.online>"
+APP_URL="http://localhost:8788"

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f4" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0a09" />
+
+    <!-- PWA / iOS «На экран Домой» -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Fuel" />
+
+    <!-- Сплэш-скрины при холодном запуске PWA на iOS, светлые и тёмные.
+         Генерируются скриптом scripts/generate-splash.mjs. -->
+    <link rel="apple-touch-startup-image" href="/splash/iphone-440x956-3x-light.png" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-430x932-3x-light.png" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-402x874-3x-light.png" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-393x852-3x-light.png" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-428x926-3x-light.png" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-390x844-3x-light.png" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-375x812-3x-light.png" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-414x896-3x-light.png" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-414x896-2x-light.png" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-414x736-3x-light.png" media="screen and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-375x667-2x-light.png" media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-440x956-3x-dark.png" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-430x932-3x-dark.png" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-402x874-3x-dark.png" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-393x852-3x-dark.png" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-428x926-3x-dark.png" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-390x844-3x-dark.png" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-375x812-3x-dark.png" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-414x896-3x-dark.png" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-414x896-2x-dark.png" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-414x736-3x-dark.png" media="screen and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)">
+    <link rel="apple-touch-startup-image" href="/splash/iphone-375x667-2x-dark.png" media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)">
+
+    <!-- Критический CSS: фон сразу в цвет приложения (светлый или тёмный),
+         без белой вспышки до монтирования Vue. -->
+    <style>
+      html, body { background: #f5f5f4; margin: 0; }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #0c0a09; }
+      }
+      #app-loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #app-loading img {
+        width: 96px;
+        height: 96px;
+        border-radius: 22px;
+        animation: app-loading-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes app-loading-pulse {
+        0%, 100% { opacity: 0.55; transform: scale(0.96); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+    </style>
+
+    <title>Fuel</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Показывается, пока грузится и монтируется Vue-приложение;
+           mount('#app') заменит это содержимое. -->
+      <div id="app-loading">
+        <img src="/apple-touch-icon.png" alt="" aria-hidden="true" />
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
