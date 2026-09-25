@@ -8,6 +8,13 @@
       "when": 1790277429745,
       "tag": "0000_secret_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790321431856,
+      "tag": "0001_boring_kronos",
+      "breakpoints": true
     }
   ]
 }

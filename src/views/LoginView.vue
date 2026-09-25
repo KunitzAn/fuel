@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError } from '../lib/api'
 import { requestLoginCode, verifyLoginCode } from '../lib/auth'
+import { runSync } from '../lib/sync'
 
 const router = useRouter()
 
@@ -33,7 +34,7 @@ async function submitCode() {
   errorMessage.value = null
   try {
     await verifyLoginCode(email.value.trim(), code.value.trim())
-    // Синк подключится в этапе 0.4 — здесь просто возвращаемся в настройки.
+    void runSync()
     router.push('/settings')
   } catch (err) {
     errorMessage.value =
