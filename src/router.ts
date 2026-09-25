@@ -31,5 +31,9 @@ export const router = createRouter({
     { path: '/settings', name: 'settings', component: SettingsView, meta: { tabBar: true } },
     // не требует сессии для показа — сам логин, страница обязана быть публичной
     { path: '/login', name: 'login', component: LoginView },
+    // Любой неизвестный адрес — на дневник. Без этого RouterView не рисует
+    // ничего и остаётся пустой экран без таб-бара (iOS может запустить
+    // PWA не со start_url, а, например, с /index.html)
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
