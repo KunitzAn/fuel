@@ -1,5 +1,5 @@
-// Иконка приложения — тост с посыпкой и разноцветными «пончиками»-О из
-// злаковых колечек (scripts/assets/icon-source.jpg, 2048×2048, квадрат).
+// Иконка приложения — тост с надписью FUEL кремом-глазурью на розовом
+// фоне (scripts/assets/icon-source.jpg, квадрат).
 // Генерирует всё, что ссылается манифест и index.html: favicon.svg (raster
 // внутри svg-обёртки — простой способ не городить растровый .ico),
 // apple-touch-icon.png, icons/*.png.
@@ -15,7 +15,7 @@ const sourceJpg = path.join(__dirname, 'assets', 'icon-source.jpg')
 
 // Фон фото — используется как поле вокруг картинки в maskable-варианте
 // (Android может обрезать иконку в круг, поэтому там нужен запас по краям).
-const BG = '#fbc5dd'
+const BG = '#feb1d0'
 
 async function squarePng(file, size) {
   await sharp(sourceJpg).resize(size, size).png().toFile(path.join(publicDir, file))
