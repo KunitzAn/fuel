@@ -5,13 +5,27 @@ import { RouterLink } from 'vue-router'
 import { checkSession, logout, me } from '../lib/auth'
 import { lastSyncError, pendingCount, runSync, syncing } from '../lib/sync'
 
-const checking = ref(true)
+// Если сессия уже известна — показываем сразу, не ждём сети (без неё на
+// iOS проверка может висеть до таймаута).
+const checking = ref(!me.value)
 
 onMounted(async () => {
   await checkSession()
   checking.value = false
   if (me.value) void runSync()
 })
+
+// Офлайн-копия готова, когда страницей управляет service worker — он
+// активируется только скачав всё приложение целиком. Пока не готова,
+// выключать интернет и перезапускать приложение бесполезно: iOS пойдёт в
+// сеть и покажет свою ошибку.
+const offlineReady = ref(false)
+if ('serviceWorker' in navigator) {
+  offlineReady.value = !!navigator.serviceWorker.controller
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    offlineReady.value = !!navigator.serviceWorker.controller
+  })
+}
 </script>
 
 <template>
@@ -47,6 +61,18 @@ onMounted(async () => {
           Войти по коду с почты
         </RouterLink>
       </template>
+    </section>
+
+    <section class="mt-3 rounded-2xl bg-card border border-line p-4">
+      <p class="text-sm text-ink">
+        Офлайн-режим:
+        <strong :class="offlineReady ? 'text-green-600' : 'text-amber-600'">
+          {{ offlineReady ? 'готов' : 'ещё загружается' }}
+        </strong>
+      </p>
+      <p v-if="!offlineReady" class="mt-1 text-xs text-muted">
+        Подержите приложение открытым с интернетом, пока статус не сменится на «готов».
+      </p>
     </section>
 
     <p class="mt-4 text-muted">Здесь будут цели и синхронизация тренировок.</p>

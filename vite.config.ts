@@ -18,6 +18,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      // Иконки манифеста (~1 МБ фото-PNG) системе нужны только при
+      // «На экран Домой» — это и так онлайн. В офлайн-копии они раздували
+      // её с ~350 КБ до ~1,25 МБ, а SW начинает отдавать страницы из кэша
+      // только скачав всё целиком: на телефоне установка не успевала до
+      // того, как приложение закрывали, и офлайн-запуск шёл в сеть.
+      includeManifestIcons: false,
       manifest: {
         name: 'Fuel',
         short_name: 'Fuel',
@@ -53,7 +59,7 @@ export default defineConfig({
         // iOS сам выбирает нужный сплэш по media query и кладёт его в свой
         // системный кэш при «Добавить на экран Домой» — нашему SW эти 22
         // файла не нужны, precache тащил бы их в офлайн-шелл зря.
-        globIgnores: ['splash/**'],
+        globIgnores: ['splash/**', 'icons/**'],
       },
     }),
   ],
