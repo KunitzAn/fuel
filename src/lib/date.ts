@@ -50,6 +50,13 @@ export function isFutureDate(date: string): boolean {
   return date > todayLocalDate()
 }
 
+/** Семь дат недели (пн…вс), содержащей `date`, по возрастанию. */
+export function weekDates(date: string): string[] {
+  const dow = (parseLocalDate(date).getDay() + 6) % 7 // 0 = понедельник
+  const monday = shiftDate(date, -dow)
+  return Array.from({ length: 7 }, (_, i) => shiftDate(monday, i))
+}
+
 export interface Month {
   year: number
   /** 1–12, а не как в Date — чтобы не путаться при сборке строки даты. */
