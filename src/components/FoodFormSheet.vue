@@ -1,23 +1,37 @@
 <script setup lang="ts">
-// Форма продукта/блюда (README «Форма продукта» / «Форма блюда»).
-// Полноэкранная, а не шторка снизу — полей слишком много для шторки.
+// Форма продукта/блюда — и создание, и правка (README «Форма продукта» /
+// «Форма блюда» + правка по обратной связи). Полноэкранная, а не шторка
+// снизу — полей слишком много для шторки.
 import { ArrowLeft } from '@lucide/vue'
 import { computed, ref } from 'vue'
-import { createFood, kcalFromMacros, macrosExceed100, macrosPer100FromForm, parseDecimal } from '../lib/foods'
+import type { Food } from '../lib/db'
+import {
+  createFood,
+  kcalFromMacros,
+  macrosExceed100,
+  macrosPer100FromForm,
+  parseDecimal,
+  softDeleteFood,
+  updateFood,
+} from '../lib/foods'
 
-const props = defineProps<{ kind: 'product' | 'dish' }>()
-const emit = defineEmits<{ close: []; saved: [foodId: string, addNow: boolean] }>()
+const props = defineProps<{ kind: 'product' | 'dish'; food?: Food }>()
+const emit = defineEmits<{ close: []; saved: [foodId: string, addNow: boolean]; deleted: [] }>()
 
-const name = ref('')
-const brand = ref('')
-const barcode = ref('')
-const note = ref('')
+const isEdit = computed(() => !!props.food)
+
+const name = ref(props.food?.name ?? '')
+const brand = ref(props.food?.brand ?? '')
+const barcode = ref(props.food?.barcode ?? '')
+const note = ref(props.food?.note ?? '')
+// Хранится всегда на 100 г — при правке нет смысла угадывать, вводили ли
+// когда-то «на порцию», просто показываем уже пересчитанное.
 const servingMode = ref<'per100' | 'perServing'>('per100')
 const servingGramsInput = ref('')
-const proteinInput = ref('')
-const fatInput = ref('')
-const carbsInput = ref('')
-const kcalInput = ref('')
+const proteinInput = ref(props.food ? String(props.food.protein) : '')
+const fatInput = ref(props.food ? String(props.food.fat) : '')
+const carbsInput = ref(props.food ? String(props.food.carbs) : '')
+const kcalInput = ref(props.food ? String(props.food.kcal) : '')
 
 const servingGrams = computed(() => parseDecimal(servingGramsInput.value) ?? 0)
 const protein = computed(() => parseDecimal(proteinInput.value) ?? 0)
@@ -38,7 +52,15 @@ const kcalMismatch = computed(() => {
   return diff > 0.1 ? Math.round(computedKcal.value) : null
 })
 
-const canSave = computed(() => name.value.trim().length > 0)
+// Без названия и БЖУ сохранить нельзя — ккал единственное необязательное,
+// оно и так считается само.
+const canSave = computed(
+  () =>
+    name.value.trim().length > 0 &&
+    parseDecimal(proteinInput.value) !== null &&
+    parseDecimal(fatInput.value) !== null &&
+    parseDecimal(carbsInput.value) !== null,
+)
 
 function fillKcalFromMacros() {
   kcalInput.value = String(Math.round(computedKcal.value))
@@ -47,7 +69,7 @@ function fillKcalFromMacros() {
 async function save(addNow: boolean) {
   if (!canSave.value) return
   const kcal = enteredKcal.value ?? computedKcal.value
-  const id = await createFood({
+  const draft = {
     kind: props.kind,
     name: name.value.trim(),
     brand: props.kind === 'product' && brand.value.trim() ? brand.value.trim() : null,
@@ -57,8 +79,24 @@ async function save(addNow: boolean) {
     carbs: per100.value.carbs,
     kcal,
     note: props.kind === 'dish' && note.value.trim() ? note.value.trim() : null,
-  })
+  }
+  let id: string
+  if (props.food) {
+    id = props.food.id
+    await updateFood(id, draft)
+  } else {
+    id = await createFood(draft)
+  }
   emit('saved', id, addNow)
+}
+
+// Мягкое удаление: прошлые записи хранят свой снимок КБЖУ и не зависят от
+// этой строки — из истории/статистики ничего не пропадает (README «Правка
+// и удаление»), пропадает только сам продукт/блюдо из будущих Продуктов/Блюд.
+async function remove() {
+  if (!props.food) return
+  await softDeleteFood(props.food.id)
+  emit('deleted')
 }
 </script>
 
@@ -68,7 +106,9 @@ async function save(addNow: boolean) {
       <button type="button" @click="emit('close')" class="w-9 h-9 flex items-center justify-center text-ink">
         <ArrowLeft :size="20" />
       </button>
-      <h1 class="text-lg font-semibold text-ink">{{ kind === 'product' ? 'Новый продукт' : 'Новое блюдо' }}</h1>
+      <h1 class="text-lg font-semibold text-ink">
+        {{ isEdit ? (kind === 'product' ? 'Продукт' : 'Блюдо') : kind === 'product' ? 'Новый продукт' : 'Новое блюдо' }}
+      </h1>
     </header>
 
     <div class="flex-1 overflow-y-auto px-4 pb-6 flex flex-col gap-4">
@@ -140,6 +180,10 @@ async function save(addNow: boolean) {
         <span class="text-xs text-muted">Заметка (из чего и в каких пропорциях — в расчётах не участвует)</span>
         <textarea v-model="note" rows="3" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent resize-none" />
       </label>
+
+      <button v-if="isEdit" type="button" @click="remove" class="text-sm text-red-500 text-left">
+        Удалить {{ kind === 'product' ? 'продукт' : 'блюдо' }}
+      </button>
     </div>
 
     <div class="px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 flex gap-2 border-t border-line bg-bg">

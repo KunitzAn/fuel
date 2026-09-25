@@ -7,7 +7,7 @@ import FoodListRow from '../components/FoodListRow.vue'
 import FoodFormSheet from '../components/FoodFormSheet.vue'
 import MealTargetSheet from '../components/MealTargetSheet.vue'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
-import { addEntryFromFood, byCreatedAt, targetLabel, type MealTarget } from '../lib/diary'
+import { addEntryFromFood, targetLabel, type MealTarget } from '../lib/diary'
 import { db, type Entry, type Food } from '../lib/db'
 import { matchesQuery } from '../lib/search'
 import { useLiveQuery } from '../lib/useLiveQuery'
@@ -40,18 +40,20 @@ const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === n
 const allFoods = useLiveQuery(() => db.foods.filter((f) => f.deletedAt === null).toArray(), [])
 const foodsById = computed(() => new Map(allFoods.value.map((f) => [f.id, f])))
 
-// Просмотр без поиска: История по дням (свежие сверху, внутри дня — в
-// порядке добавления), Продукты/Блюда — весь список.
-const historyByDay = computed(() => {
-  const byDate = new Map<string, Entry[]>()
-  for (const e of allEntries.value) {
-    const list = byDate.get(e.date) ?? []
-    list.push(e)
-    byDate.set(e.date, list)
+// История — без дублей: один и тот же продукт не размножается по дням,
+// при повторном добавлении просто поднимается наверх с последними
+// граммами (обратная связь по факту использования — в README был мокап
+// по дням, но на практике это оказалось неудобно). Строится одинаково и
+// для вкладки без поиска, и для блока при поиске — фильтр по query, если
+// он пустой, matchesQuery пропускает всё
+const historyRows = computed(() => {
+  const matched = allEntries.value.filter((e) => e.foodId && matchesQuery(query.value, e.name, e.brand))
+  const latestByFood = new Map<string, Entry>()
+  for (const e of matched) {
+    const prev = latestByFood.get(e.foodId!)
+    if (!prev || e.createdAt > prev.createdAt) latestByFood.set(e.foodId!, e)
   }
-  return [...byDate.entries()]
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([date, entries]) => ({ date, entries: entries.sort(byCreatedAt) }))
+  return [...latestByFood.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 })
 const products = computed(() =>
   allFoods.value
@@ -66,19 +68,8 @@ const dishes = computed(() =>
 
 // Поиск: все разделы сразу блоками, каждый продукт — один раз, в самом
 // верхнем блоке, где нашёлся (История → Продукты → Блюда → База; см.
-// README «Поиск»). В Истории при поиске — по одной, самой свежей записи
-// на продукт, а не всё подряд: ищут, чтобы быстро добавить снова, а не
-// пролистать историю целиком (для этого есть режим без поиска)
-const historySearchRows = computed(() => {
-  const matched = allEntries.value.filter((e) => e.foodId && matchesQuery(query.value, e.name, e.brand))
-  const latestByFood = new Map<string, Entry>()
-  for (const e of matched) {
-    const prev = latestByFood.get(e.foodId!)
-    if (!prev || e.createdAt > prev.createdAt) latestByFood.set(e.foodId!, e)
-  }
-  return [...latestByFood.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-})
-const usedAfterHistory = computed(() => new Set(historySearchRows.value.map((e) => e.foodId!)))
+// README «Поиск»)
+const usedAfterHistory = computed(() => new Set(historyRows.value.map((e) => e.foodId!)))
 const productsSearchRows = computed(() => products.value.filter((f) => !usedAfterHistory.value.has(f.id)))
 const usedAfterProducts = computed(
   () => new Set([...usedAfterHistory.value, ...productsSearchRows.value.map((f) => f.id)]),
@@ -162,11 +153,11 @@ function afterAdd() {
     <div class="flex-1 overflow-y-auto px-4 pb-6">
       <!-- Поиск: блоки по очереди, каждый продукт один раз -->
       <template v-if="searching">
-        <template v-if="historySearchRows.length">
+        <template v-if="historyRows.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">История</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
             <FoodListRow
-              v-for="entry in historySearchRows"
+              v-for="entry in historyRows"
               :key="entry.id"
               :title="entry.name"
               :trailing="`${entry.grams} г`"
@@ -200,29 +191,24 @@ function afterAdd() {
             />
           </div>
         </template>
-        <p v-if="!historySearchRows.length && !productsSearchRows.length && !dishesSearchRows.length" class="text-sm text-muted py-6 text-center">
+        <p v-if="!historyRows.length && !productsSearchRows.length && !dishesSearchRows.length" class="text-sm text-muted py-6 text-center">
           Ничего не нашлось
         </p>
         <!-- База — этап 2, для нее нужен сервер -->
       </template>
 
-      <!-- Без поиска: вкладки -->
+      <!-- Без поиска: вкладки. История — без дублей, последнее использование сверху -->
       <template v-else-if="tab === 'history'">
-        <p v-if="historyByDay.length === 0" class="text-sm text-muted py-6 text-center">Пока пусто</p>
-        <div v-for="group in historyByDay" :key="group.date" class="mb-4">
-          <h3 class="text-xs text-muted mb-1.5 px-1">
-            {{ group.date === date ? 'Сегодня' : capitalizeFirst(formatDateWithWeekday(group.date)) }}
-          </h3>
-          <div class="rounded-2xl bg-card border border-line overflow-hidden">
-            <FoodListRow
-              v-for="entry in group.entries"
-              :key="entry.id"
-              :title="entry.name"
-              :trailing="`${entry.grams} г`"
-              @open="openEntry(entry)"
-              @add="quickAddFromEntry(entry)"
-            />
-          </div>
+        <div class="rounded-2xl bg-card border border-line overflow-hidden">
+          <p v-if="historyRows.length === 0" class="px-4 py-3 text-sm text-muted">Пока пусто</p>
+          <FoodListRow
+            v-for="entry in historyRows"
+            :key="entry.id"
+            :title="entry.name"
+            :trailing="`${entry.grams} г`"
+            @open="openEntry(entry)"
+            @add="quickAddFromEntry(entry)"
+          />
         </div>
       </template>
 
