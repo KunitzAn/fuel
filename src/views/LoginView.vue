@@ -3,12 +3,13 @@ import { ArrowLeft } from '@lucide/vue'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError } from '../lib/api'
-import { requestLoginCode, verifyLoginCode } from '../lib/auth'
+import { lastLoginEmail, requestLoginCode, verifyLoginCode } from '../lib/auth'
 import { runSync } from '../lib/sync'
 
 const router = useRouter()
 
-const email = ref('')
+// Почта прошлого входа на этом устройстве — сразу в поле, остаётся нажать «Прислать код».
+const email = ref(lastLoginEmail())
 const code = ref('')
 const step = ref<'email' | 'code'>('email')
 const loading = ref(false)

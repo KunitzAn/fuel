@@ -31,6 +31,28 @@ export async function requestLoginCode(email: string): Promise<void> {
 export async function verifyLoginCode(email: string, code: string): Promise<void> {
   me.value = await api.post<Me>('/api/auth/verify-code', { email, code })
   authChecked.value = true
+  rememberEmail(me.value.email)
+}
+
+// Почта последнего успешного входа — подставляется в форму входа на этом
+// устройстве. Удобство, не данные: localStorage может быть недоступен
+// (приватный режим, почищенные данные сайта) — тогда просто пустое поле.
+const LAST_EMAIL_KEY = 'fuel:lastLoginEmail'
+
+function rememberEmail(email: string): void {
+  try {
+    localStorage.setItem(LAST_EMAIL_KEY, email)
+  } catch {
+    // нет хранилища — не страшно
+  }
+}
+
+export function lastLoginEmail(): string {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 export async function logout(): Promise<void> {
