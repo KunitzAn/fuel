@@ -14,7 +14,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "catalog:generate": "drizzle-kit generate --config drizzle.catalog.config.ts",
-    "catalog:migrate": "drizzle-kit migrate --config drizzle.catalog.config.ts"
+    "catalog:migrate": "drizzle-kit migrate --config drizzle.catalog.config.ts",
+    "catalog:seed": "node scripts/seed-catalog.mjs"
   },
   "dependencies": {
     "@lucide/vue": "^1.48.0",
