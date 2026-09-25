@@ -2,7 +2,8 @@
  * Мутации записей дневника — центральное место для dirty/updatedAt/синка,
  * чтобы экраны не дублировали эту логику в каждом обработчике клика.
  */
-import { db, type Entry, type Snack } from './db'
+import { db, type Entry, type Food, type Snack } from './db'
+import { rememberLastGrams } from './foods'
 import { runSync } from './sync'
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner'
@@ -18,6 +19,47 @@ export const MEAL_GENITIVE: Record<Meal, string> = {
   breakfast: 'завтрака',
   lunch: 'обеда',
   dinner: 'ужина',
+}
+
+/** Куда добавляем запись — обычный приём или конкретный перекус. */
+export type MealTarget =
+  | { type: 'meal'; meal: Meal }
+  | { type: 'snack'; snackId: string; name: string }
+
+export function targetLabel(t: MealTarget): string {
+  return t.type === 'meal' ? MEAL_LABELS[t.meal] : t.name
+}
+
+/**
+ * Создать запись из продукта/блюда — общая точка для быстрого «+» в
+ * строке (README: «с граммами из прошлой записи, без окна») и окна
+ * ввода граммов. Снимок КБЖУ берём из food на этот момент — дальнейшая
+ * правка продукта прошлые записи не трогает (README «Правка и удаление»).
+ */
+export async function addEntryFromFood(food: Food, date: string, target: MealTarget, grams: number): Promise<void> {
+  const id = crypto.randomUUID()
+  const now = new Date().toISOString()
+  await db.entries.add({
+    id,
+    date,
+    meal: target.type === 'meal' ? target.meal : 'snack',
+    snackId: target.type === 'snack' ? target.snackId : null,
+    foodId: food.id,
+    catalogId: null,
+    name: food.name,
+    brand: food.brand,
+    protein: food.protein,
+    fat: food.fat,
+    carbs: food.carbs,
+    kcal: food.kcal,
+    grams,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    dirty: true,
+  })
+  await rememberLastGrams(food.id, grams)
+  void runSync()
 }
 
 export async function updateEntryGrams(id: string, grams: number): Promise<void> {
