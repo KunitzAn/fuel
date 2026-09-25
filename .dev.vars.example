@@ -6,4 +6,7 @@ RESEND_API_KEY="re_..."
 # Отправитель — только подтверждённый в Resend домен/поддомен
 # (resend.com/domains), не обязательно корневой kunitcan.online
 LOGIN_EMAIL_FROM="Fuel <fuel@hithere.kunitcan.online>"
-APP_URL="http://localhost:8788"
+# 5173 (Vite), не 8788 (wrangler): браузер открыт на порту Vite, тот сам
+# проксирует /api/* на wrangler (см. vite.config.ts) — sameOrigin-проверка
+# в _lib/http.ts сверяет это значение с Origin реального запроса браузера
+APP_URL="http://localhost:5173"

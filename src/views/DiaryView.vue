@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { Calendar, Search, Settings } from '@lucide/vue'
-import { computed, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import DayPickerSheet from '../components/DayPickerSheet.vue'
 import MealCard from '../components/MealCard.vue'
+import SnackCard from '../components/SnackCard.vue'
 import WeekStrip from '../components/WeekStrip.vue'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate, weekDates } from '../lib/date'
-import { byCreatedAt } from '../lib/diary'
+import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } from '../lib/diary'
 import { db } from '../lib/db'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { useLiveQuery } from '../lib/useLiveQuery'
+
+const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner']
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +24,7 @@ const today = todayLocalDate()
 // фильтруем по дню/приёму реактивным computed — так смена даты не требует
 // пересоздавать Dexie-подписку на каждый свайп/тап по неделе.
 const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === null).toArray(), [])
+const allSnacks = useLiveQuery(() => db.snacks.filter((s) => s.deletedAt === null).toArray(), [])
 
 const dayEntries = computed(() => allEntries.value.filter((e) => e.date === date.value).sort(byCreatedAt))
 const dayTotals = computed(() =>
@@ -32,6 +36,16 @@ const mealEntries = computed(() => ({
   lunch: dayEntries.value.filter((e) => e.meal === 'lunch'),
   dinner: dayEntries.value.filter((e) => e.meal === 'dinner'),
 }))
+
+const daySnacks = computed(() => allSnacks.value.filter((s) => s.date === date.value))
+const snacksByMeal = computed(() => ({
+  breakfast: daySnacks.value.filter((s) => s.after === 'breakfast').sort(bySnackPosition),
+  lunch: daySnacks.value.filter((s) => s.after === 'lunch').sort(bySnackPosition),
+  dinner: daySnacks.value.filter((s) => s.after === 'dinner').sort(bySnackPosition),
+}))
+function entriesForSnack(snackId: string) {
+  return dayEntries.value.filter((e) => e.snackId === snackId)
+}
 
 const datesWithEntries = computed(() => {
   const week = new Set(weekDates(date.value))
@@ -51,6 +65,19 @@ function pickDay(d: string) {
   pickingDay.value = false
   selectDate(d)
 }
+
+// «Пустой перекус исчезает, когда уходишь с экрана» (README) — чистим день,
+// который покидаем: и при смене даты (свайп/календарь), и при уходе с
+// дневника вовсе. Уход на добавление еды в этот же перекус — тоже formально
+// уход с маршрута, но снести перекус раньше, чем в него успели что-то
+// положить, было бы просто багом, поэтому туда — без очистки.
+watch(date, (_, previousDate) => {
+  if (previousDate) void cleanupEmptySnacksForDate(previousDate)
+})
+onBeforeRouteLeave((to) => {
+  if (to.name === 'add-food' || to.name === 'add-food-snack') return
+  void cleanupEmptySnacksForDate(date.value)
+})
 </script>
 
 <template>
@@ -100,11 +127,18 @@ function pickDay(d: string) {
     <!-- Цель («123/120», ⚡) появится в этапе 4 — пока показываем только факт -->
 
     <div class="flex flex-col gap-3">
-      <MealCard meal="breakfast" :date="date" :entries="mealEntries.breakfast" :day-kcal="dayTotals.kcal" />
-      <MealCard meal="lunch" :date="date" :entries="mealEntries.lunch" :day-kcal="dayTotals.kcal" />
-      <MealCard meal="dinner" :date="date" :entries="mealEntries.dinner" :day-kcal="dayTotals.kcal" />
+      <template v-for="meal in MEALS" :key="meal">
+        <MealCard :meal="meal" :date="date" :entries="mealEntries[meal]" :day-kcal="dayTotals.kcal" />
+        <SnackCard
+          v-for="snack in snacksByMeal[meal]"
+          :key="snack.id"
+          :snack="snack"
+          :entries="entriesForSnack(snack.id)"
+          :day-kcal="dayTotals.kcal"
+        />
+      </template>
     </div>
-    <!-- Перекусы и карточка энергии — этапы 1.3 и 4 -->
+    <!-- Карточка энергии — этап 4 -->
 
     <DayPickerSheet v-if="pickingDay" @close="pickingDay = false" @pick="pickDay" />
   </main>

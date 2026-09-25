@@ -4,10 +4,12 @@
 // вёл куда-то.
 import { ArrowLeft } from '@lucide/vue'
 import { useRouter } from 'vue-router'
-import { MEAL_LABELS } from '../lib/diary'
+import { MEAL_LABELS, type Meal } from '../lib/diary'
 
-const props = defineProps<{ date: string; meal: 'breakfast' | 'lunch' | 'dinner' }>()
+const props = defineProps<{ date: string; meal: Meal | 'snack'; snackId?: string }>()
 const router = useRouter()
+
+const title = props.meal === 'snack' ? 'Перекус' : MEAL_LABELS[props.meal]
 </script>
 
 <template>
@@ -20,7 +22,7 @@ const router = useRouter()
       >
         <ArrowLeft :size="20" class="text-ink" />
       </button>
-      <h1 class="text-lg font-semibold text-ink">{{ MEAL_LABELS[props.meal] }} · {{ props.date }}</h1>
+      <h1 class="text-lg font-semibold text-ink">{{ title }} · {{ props.date }}</h1>
     </header>
     <p class="text-sm text-muted">Поиск и добавление еды — этап 1.4.</p>
   </main>

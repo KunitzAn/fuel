@@ -1,42 +1,60 @@
 <script setup lang="ts">
-import { ChevronDown, Plus, Sun, Sunrise, Sunset } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { ChevronDown, Plus } from '@lucide/vue'
+import { computed, nextTick, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import EntryList from './EntryList.vue'
-import type { Entry } from '../lib/db'
-import { createSnack, MEAL_GENITIVE, MEAL_LABELS, type Meal } from '../lib/diary'
+import type { Entry, Snack } from '../lib/db'
+import { renameSnack } from '../lib/diary'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
+import EntryList from './EntryList.vue'
 
 const props = defineProps<{
-  meal: Meal
-  date: string
-  entries: Entry[] // уже отфильтрованы и отсортированы по этому приёму
-  dayKcal: number // для доли «26%» — сумма ккал за весь день
+  snack: Snack
+  entries: Entry[]
+  dayKcal: number
 }>()
 
-const MEAL_ICON = { breakfast: Sunrise, lunch: Sun, dinner: Sunset }
-
 const expanded = ref(false)
+const renaming = ref(false)
+const nameDraft = ref(props.snack.name)
+const nameInput = ref<HTMLInputElement | null>(null)
 
 const totals = computed(() => sumMacros(props.entries.map((e) => scaleByGrams(e, e.grams))))
 const sharePercent = computed(() =>
   props.dayKcal > 0 ? Math.round((totals.value.kcal / props.dayKcal) * 100) : 0,
 )
 
-function addSnack() {
-  void createSnack(props.date, props.meal)
-  expanded.value = true // сразу видно новую карточку перекуса под этой
+async function startRename() {
+  nameDraft.value = props.snack.name
+  renaming.value = true
+  await nextTick()
+  nameInput.value?.focus()
+  nameInput.value?.select()
+}
+
+function commitRename() {
+  renaming.value = false
+  if (nameDraft.value.trim() !== props.snack.name) void renameSnack(props.snack.id, nameDraft.value)
 }
 </script>
 
 <template>
   <section class="rounded-2xl bg-card border border-line overflow-hidden">
     <div class="flex items-center gap-2 px-4 pt-3">
-      <component :is="MEAL_ICON[meal]" :size="16" class="text-accent shrink-0" />
-      <h3 class="text-sm font-semibold text-ink flex-1">{{ MEAL_LABELS[meal] }}</h3>
+      <input
+        v-if="renaming"
+        ref="nameInput"
+        v-model="nameDraft"
+        type="text"
+        @blur="commitRename"
+        @keyup.enter="commitRename"
+        class="flex-1 text-sm font-semibold text-ink bg-transparent outline-none border-b border-accent"
+      />
+      <button v-else type="button" @click="startRename" class="text-sm font-semibold text-ink flex-1 text-left">
+        {{ snack.name }}
+      </button>
       <span class="text-sm text-muted">{{ Math.round(totals.kcal) }} ккал</span>
       <RouterLink
-        :to="`/day/${date}/add/${meal}`"
+        :to="`/day/${snack.date}/snack/${snack.id}/add`"
         aria-label="Добавить"
         class="w-7 h-7 rounded-full flex items-center justify-center text-accent"
       >
@@ -59,17 +77,8 @@ function addSnack() {
       <ChevronDown :size="16" class="text-muted transition-transform" :class="expanded ? 'rotate-180' : ''" />
     </button>
 
-    <template v-if="expanded">
-      <div class="border-t border-line">
-        <EntryList :entries="entries" />
-      </div>
-      <button
-        type="button"
-        @click="addSnack"
-        class="w-full text-left px-4 py-2.5 text-sm text-accent border-t border-line"
-      >
-        + перекус после {{ MEAL_GENITIVE[meal] }}
-      </button>
-    </template>
+    <div v-if="expanded" class="border-t border-line">
+      <EntryList :entries="entries" />
+    </div>
   </section>
 </template>
