@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ChevronDown, ScanLine } from '@lucide/vue'
+import { ArrowLeft, ChevronDown, ListChecks, ScanLine } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddEntrySheet from '../components/AddEntrySheet.vue'
@@ -109,6 +109,45 @@ function afterAdd() {
   openingFood.value = null
   void router.push(`/day/${props.date}`)
 }
+
+// Множественный выбор — по обратной связи, не из README: отметить сразу
+// несколько строк (и с разных вкладок/блоков — состояние общее на весь
+// экран, не сбрасывается переключением вкладки) со своим весом у каждой,
+// добавить всё одним разом.
+const selectMode = ref(false)
+const selection = ref(new Map<string, number>()) // foodId -> граммы
+const selectedCount = computed(() => selection.value.size)
+
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selection.value = new Map()
+}
+function toggleSelect(foodId: string) {
+  const next = new Map(selection.value)
+  if (next.has(foodId)) {
+    next.delete(foodId)
+  } else {
+    const food = foodsById.value.get(foodId)
+    next.set(foodId, food?.lastGrams ?? 100)
+  }
+  selection.value = next
+}
+function setSelectionGrams(foodId: string, grams: number) {
+  if (!selection.value.has(foodId)) return
+  const next = new Map(selection.value)
+  next.set(foodId, grams)
+  selection.value = next
+}
+
+async function bulkAdd() {
+  for (const [foodId, grams] of selection.value) {
+    const food = foodsById.value.get(foodId)
+    if (food && grams > 0) await addEntryFromFood(food, props.date, target.value, grams)
+  }
+  selection.value = new Map()
+  selectMode.value = false
+  void router.push(`/day/${props.date}`)
+}
 </script>
 
 <template>
@@ -125,6 +164,10 @@ function afterAdd() {
         <span class="text-sm text-muted">
           {{ date === todayLocalDate() ? 'сегодня' : capitalizeFirst(formatDateWithWeekday(date)) }}
         </span>
+        <button type="button" @click="toggleSelectMode" class="ml-auto flex items-center gap-1 text-sm" :class="selectMode ? 'text-accent' : 'text-muted'">
+          <ListChecks :size="16" />
+          {{ selectMode ? 'Отмена' : 'Выбрать' }}
+        </button>
       </div>
 
       <div class="flex items-center gap-2">
@@ -161,8 +204,13 @@ function afterAdd() {
               :key="entry.id"
               :title="entry.name"
               :trailing="`${entry.grams} г`"
+              :selectable="selectMode"
+              :selected="selection.has(entry.foodId!)"
+              :grams="selection.get(entry.foodId!)"
               @open="openEntry(entry)"
               @add="quickAddFromEntry(entry)"
+              @toggle="toggleSelect(entry.foodId!)"
+              @update:grams="setSelectionGrams(entry.foodId!, $event)"
             />
           </div>
         </template>
@@ -174,8 +222,13 @@ function afterAdd() {
               :key="food.id"
               :title="food.name"
               :subtitle="food.brand"
+              :selectable="selectMode"
+              :selected="selection.has(food.id)"
+              :grams="selection.get(food.id)"
               @open="openingFood = food"
               @add="quickAdd(food)"
+              @toggle="toggleSelect(food.id)"
+              @update:grams="setSelectionGrams(food.id, $event)"
             />
           </div>
         </template>
@@ -186,8 +239,13 @@ function afterAdd() {
               v-for="food in dishesSearchRows"
               :key="food.id"
               :title="food.name"
+              :selectable="selectMode"
+              :selected="selection.has(food.id)"
+              :grams="selection.get(food.id)"
               @open="openingFood = food"
               @add="quickAdd(food)"
+              @toggle="toggleSelect(food.id)"
+              @update:grams="setSelectionGrams(food.id, $event)"
             />
           </div>
         </template>
@@ -206,8 +264,13 @@ function afterAdd() {
             :key="entry.id"
             :title="entry.name"
             :trailing="`${entry.grams} г`"
+            :selectable="selectMode"
+            :selected="selection.has(entry.foodId!)"
+            :grams="selection.get(entry.foodId!)"
             @open="openEntry(entry)"
             @add="quickAddFromEntry(entry)"
+            @toggle="toggleSelect(entry.foodId!)"
+            @update:grams="setSelectionGrams(entry.foodId!, $event)"
           />
         </div>
       </template>
@@ -220,8 +283,13 @@ function afterAdd() {
             :key="food.id"
             :title="food.name"
             :subtitle="food.brand"
+            :selectable="selectMode"
+            :selected="selection.has(food.id)"
+            :grams="selection.get(food.id)"
             @open="openingFood = food"
             @add="quickAdd(food)"
+            @toggle="toggleSelect(food.id)"
+            @update:grams="setSelectionGrams(food.id, $event)"
           />
         </div>
         <button type="button" @click="creatingKind = 'product'" class="text-sm text-accent px-1">+ Новый продукт</button>
@@ -234,12 +302,31 @@ function afterAdd() {
             v-for="food in dishes"
             :key="food.id"
             :title="food.name"
+            :selectable="selectMode"
+            :selected="selection.has(food.id)"
+            :grams="selection.get(food.id)"
             @open="openingFood = food"
             @add="quickAdd(food)"
+            @toggle="toggleSelect(food.id)"
+            @update:grams="setSelectionGrams(food.id, $event)"
           />
         </div>
         <button type="button" @click="creatingKind = 'dish'" class="text-sm text-accent px-1">+ Новое блюдо</button>
       </template>
+    </div>
+
+    <div
+      v-if="selectMode && selectedCount > 0"
+      class="sticky bottom-0 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] border-t border-line bg-bg"
+    >
+      <button
+        type="button"
+        aria-label="Добавить выбранное"
+        @click="bulkAdd"
+        class="w-full rounded-2xl py-3 text-sm font-medium text-white bg-accent"
+      >
+        Добавить ({{ selectedCount }})
+      </button>
     </div>
 
     <MealTargetSheet v-if="pickingTarget" :date="date" @close="pickingTarget = false" @pick="pickTarget" />
