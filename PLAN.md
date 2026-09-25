@@ -402,9 +402,18 @@ README дословно — добавила/поменяла по факту и
 
 ### 2.1 База `fuel-catalog`
 
-- [ ] Схема `catalog_products`, `pg_trgm`, GIN-индекс по `search`,
-      уникальный по `barcode`
-- [ ] Отдельный `drizzle.config` / миграции для каталога
+- [x] Схема `catalog_products`, `pg_trgm`, GIN-индекс по `search`,
+      уникальный по `barcode` (`db/catalogSchema.ts`). **id стабильные**:
+      `off:<штрихкод>` / `basic:<slug>`, не случайные — на них ссылаются
+      `entries.catalogId` и `foods.sourceCatalogId`, а каталог будет
+      перезаливаться; случайные id при перезаливке оборвали бы ссылки
+- [x] Отдельный `drizzle.catalog.config.ts`, миграции в
+      `db/catalog-migrations`, скрипты `npm run catalog:generate/migrate`.
+      `CREATE EXTENSION pg_trgm` дописан в миграцию руками — drizzle-kit
+      расширения не создаёт. Накатано на Neon `fuel-catalog`, индексы
+      проверены в `pg_indexes`
+- [x] Нормализация для поиска — `db/searchText.ts`, те же правила, что у
+      локального поиска на клиенте (регистр, ё=е, запятые/точки)
 
 ### 2.2 Базовые продукты (seed)
 
