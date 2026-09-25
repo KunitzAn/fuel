@@ -61,6 +61,25 @@ export async function renameSnack(id: string, name: string): Promise<void> {
 }
 
 /**
+ * Удаление перекуса целиком (не только пустого — README про это не пишет,
+ * но без этого некуда деться от перекуса с едой, если передумал). Гасим
+ * мягко и сам перекус, и его записи — иначе они осиротеют: не покажутся
+ * нигде (SnackCard для удалённого перекуса не рендерится), но продолжат
+ * считаться в сумме дня.
+ */
+export async function softDeleteSnack(id: string): Promise<void> {
+  const now = new Date().toISOString()
+  const entries = await db.entries.where('snackId').equals(id).and((e) => !e.deletedAt).toArray()
+  await db.transaction('rw', db.snacks, db.entries, async () => {
+    await db.snacks.update(id, { deletedAt: now, updatedAt: now, dirty: true })
+    for (const e of entries) {
+      await db.entries.update(e.id, { deletedAt: now, updatedAt: now, dirty: true })
+    }
+  })
+  void runSync()
+}
+
+/**
  * «Пустой перекус исчезает, когда уходишь с экрана» (README) — перекусы
  * без единой записи для этого дня гасим мягко при выходе из дневника.
  * Вызывается из DiaryView при уходе с экрана, не при каждом чихе — иначе

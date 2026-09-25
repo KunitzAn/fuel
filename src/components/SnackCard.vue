@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ChevronDown, Plus } from '@lucide/vue'
+import { ChevronDown, Plus, Trash2 } from '@lucide/vue'
 import { computed, nextTick, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Entry, Snack } from '../lib/db'
-import { renameSnack } from '../lib/diary'
+import { renameSnack, softDeleteSnack } from '../lib/diary'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import EntryList from './EntryList.vue'
 
@@ -35,6 +35,10 @@ function commitRename() {
   renaming.value = false
   if (nameDraft.value.trim() !== props.snack.name) void renameSnack(props.snack.id, nameDraft.value)
 }
+
+function remove() {
+  void softDeleteSnack(props.snack.id)
+}
 </script>
 
 <template>
@@ -53,6 +57,14 @@ function commitRename() {
         {{ snack.name }}
       </button>
       <span class="text-sm text-muted">{{ Math.round(totals.kcal) }} ккал</span>
+      <button
+        type="button"
+        aria-label="Удалить перекус"
+        @click="remove"
+        class="w-7 h-7 rounded-full flex items-center justify-center text-muted"
+      >
+        <Trash2 :size="16" />
+      </button>
       <RouterLink
         :to="`/day/${snack.date}/snack/${snack.id}/add`"
         aria-label="Добавить"

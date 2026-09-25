@@ -4,7 +4,7 @@
 // у него будет и подстановка «граммы с прошлого раза», и выбор приёма.
 import { computed, ref } from 'vue'
 import type { Entry } from '../lib/db'
-import { updateEntryGrams } from '../lib/diary'
+import { softDeleteEntry, updateEntryGrams } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
 
 const props = defineProps<{ entry: Entry }>()
@@ -24,6 +24,14 @@ const scaled = computed(() => scaleByGrams(per100.value, grams.value))
 async function save() {
   if (grams.value <= 0) return
   await updateEntryGrams(props.entry.id, grams.value)
+  emit('close')
+}
+
+// Кнопка-дублёр свайпа: свайп пока без анимации, поэтому не всем очевиден
+// (см. PLAN.md, этап 8) — а окно уже открыто тапом, так что удалить отсюда
+// логично, не обязательно уходить искать строку снова.
+async function remove() {
+  await softDeleteEntry(props.entry.id)
   emit('close')
 }
 </script>
@@ -73,6 +81,9 @@ async function save() {
           Сохранить
         </button>
       </div>
+      <button type="button" @click="remove" class="text-sm text-red-500">
+        Удалить запись
+      </button>
     </div>
   </div>
 </template>
