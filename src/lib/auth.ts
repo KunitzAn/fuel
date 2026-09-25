@@ -15,7 +15,9 @@ export async function checkSession(): Promise<Me | null> {
   try {
     me.value = await api.get<Me>('/api/me')
   } catch (err) {
-    me.value = err instanceof ApiError && err.status === 401 ? null : null
+    // Сбрасываем только на настоящий «не вошли» (401). Нет сети/таймаут —
+    // не повод разлогинивать: оставляем то, что уже знали.
+    if (err instanceof ApiError && err.status === 401) me.value = null
   } finally {
     authChecked.value = true
   }

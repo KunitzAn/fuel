@@ -7,12 +7,25 @@ class ApiError extends Error {
   }
 }
 
+// iOS в авиарежиме не отклоняет fetch, а подвешивает его. Без таймаута
+// подвисший синк держит флаг `syncing` вечно, и все следующие попытки
+// синка в этой сессии молча пропускаются даже после появления сети.
+const REQUEST_TIMEOUT_MS = 15_000
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(path, {
+      ...init,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new ApiError(res.status, body?.error ?? res.statusText)
