@@ -15,6 +15,9 @@ const REQUEST_TIMEOUT_MS = 15_000
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  // Внешняя отмена (поиск по каталогу гасит предыдущий запрос на каждую букву)
+  // поверх своего таймаута — без AbortSignal.any, его нет на старых iOS.
+  init?.signal?.addEventListener('abort', () => controller.abort())
   let res: Response
   try {
     res = await fetch(path, {
@@ -35,7 +38,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
 }

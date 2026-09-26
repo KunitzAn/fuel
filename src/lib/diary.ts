@@ -2,8 +2,9 @@
  * Мутации записей дневника — центральное место для dirty/updatedAt/синка,
  * чтобы экраны не дублировали эту логику в каждом обработчике клика.
  */
-import { db, type Entry, type Food, type Snack } from './db'
+import { db, type Entry, type Snack } from './db'
 import { rememberLastGrams } from './foods'
+import type { PickItem } from './pick'
 import { runSync } from './sync'
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner'
@@ -31,12 +32,13 @@ export function targetLabel(t: MealTarget): string {
 }
 
 /**
- * Создать запись из продукта/блюда — общая точка для быстрого «+» в
- * строке (README: «с граммами из прошлой записи, без окна») и окна
- * ввода граммов. Снимок КБЖУ берём из food на этот момент — дальнейшая
- * правка продукта прошлые записи не трогает (README «Правка и удаление»).
+ * Создать запись — общая точка для быстрого «+» в строке (README: «с
+ * граммами из прошлой записи, без окна»), окна ввода граммов и массового
+ * добавления. Источник — свой продукт или продукт каталога (см. lib/pick.ts).
+ * Снимок КБЖУ берём на этот момент — дальнейшая правка продукта прошлые
+ * записи не трогает (README «Правка и удаление»).
  */
-export async function addEntryFromFood(food: Food, date: string, target: MealTarget, grams: number): Promise<void> {
+export async function addEntry(item: PickItem, date: string, target: MealTarget, grams: number): Promise<void> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   await db.entries.add({
@@ -44,21 +46,23 @@ export async function addEntryFromFood(food: Food, date: string, target: MealTar
     date,
     meal: target.type === 'meal' ? target.meal : 'snack',
     snackId: target.type === 'snack' ? target.snackId : null,
-    foodId: food.id,
-    catalogId: null,
-    name: food.name,
-    brand: food.brand,
-    protein: food.protein,
-    fat: food.fat,
-    carbs: food.carbs,
-    kcal: food.kcal,
+    foodId: item.foodId,
+    catalogId: item.catalogId,
+    name: item.name,
+    brand: item.brand,
+    protein: item.protein,
+    fat: item.fat,
+    carbs: item.carbs,
+    kcal: item.kcal,
     grams,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
     dirty: true,
   })
-  await rememberLastGrams(food.id, grams)
+  // У продукта каталога своей строки нет — его «прошлые граммы» и так
+  // найдутся по последней записи с этим catalogId.
+  if (item.foodId) await rememberLastGrams(item.foodId, grams)
   void runSync()
 }
 

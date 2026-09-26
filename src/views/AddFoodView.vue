@@ -3,12 +3,14 @@ import { ArrowLeft, ChevronDown, ListChecks, ScanLine } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddEntrySheet from '../components/AddEntrySheet.vue'
-import FoodListRow from '../components/FoodListRow.vue'
 import FoodFormSheet from '../components/FoodFormSheet.vue'
+import FoodListRow from '../components/FoodListRow.vue'
 import MealTargetSheet from '../components/MealTargetSheet.vue'
+import { useCatalogSearch } from '../lib/catalog'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
-import { addEntryFromFood, targetLabel, type MealTarget } from '../lib/diary'
-import { db, type Entry, type Food } from '../lib/db'
+import { db, type Entry } from '../lib/db'
+import { addEntry, targetLabel, type MealTarget } from '../lib/diary'
+import { pickFromCatalog, pickFromEntry, pickFromFood, type PickItem } from '../lib/pick'
 import { matchesQuery } from '../lib/search'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
@@ -32,7 +34,7 @@ function pickTarget(t: MealTarget) {
   pickingTarget.value = false
 }
 
-const tab = ref<'history' | 'products' | 'dishes'>('history')
+const tab = ref<'history' | 'products' | 'dishes' | 'catalog'>('history')
 const query = ref('')
 const searching = computed(() => query.value.trim().length > 0)
 
@@ -40,113 +42,143 @@ const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === n
 const allFoods = useLiveQuery(() => db.foods.filter((f) => f.deletedAt === null).toArray(), [])
 const foodsById = computed(() => new Map(allFoods.value.map((f) => [f.id, f])))
 
-// История — без дублей: один и тот же продукт не размножается по дням,
-// при повторном добавлении просто поднимается наверх с последними
-// граммами (обратная связь по факту использования — в README был мокап
-// по дням, но на практике это оказалось неудобно). Строится одинаково и
-// для вкладки без поиска, и для блока при поиске — фильтр по query, если
-// он пустой, matchesQuery пропускает всё
+// История — без дублей: один продукт один раз, последний использованный
+// сверху, с последними граммами (обратная связь; README был по дням).
+// Теперь в ней и продукты каталога — ключ по foodId либо catalogId.
 const historyRows = computed(() => {
-  const matched = allEntries.value.filter((e) => e.foodId && matchesQuery(query.value, e.name, e.brand))
-  const latestByFood = new Map<string, Entry>()
-  for (const e of matched) {
-    const prev = latestByFood.get(e.foodId!)
-    if (!prev || e.createdAt > prev.createdAt) latestByFood.set(e.foodId!, e)
+  const latest = new Map<string, Entry>()
+  for (const e of allEntries.value) {
+    const key = e.foodId ? `food:${e.foodId}` : e.catalogId ? `catalog:${e.catalogId}` : null
+    if (!key || !matchesQuery(query.value, e.name, e.brand)) continue
+    const prev = latest.get(key)
+    if (!prev || e.createdAt > prev.createdAt) latest.set(key, e)
   }
-  return [...latestByFood.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return [...latest.values()]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((e) => ({ entry: e, item: pickFromEntry(e, foodsById.value) }))
+    .filter((r): r is { entry: Entry; item: PickItem } => r.item !== null)
 })
-const products = computed(() =>
+
+const productRows = computed(() =>
   allFoods.value
     .filter((f) => f.kind === 'product' && matchesQuery(query.value, f.name, f.brand))
-    .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    .map(pickFromFood),
 )
-const dishes = computed(() =>
+const dishRows = computed(() =>
   allFoods.value
     .filter((f) => f.kind === 'dish' && matchesQuery(query.value, f.name))
-    .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    .map(pickFromFood),
+)
+
+// База — только с сервера (см. lib/catalog.ts). Прошлые граммы у продукта
+// каталога — из последней записи с ним: своей строки, где их хранить, нет.
+const catalog = useCatalogSearch(query)
+const lastGramsByCatalog = computed(() => {
+  const latest = new Map<string, Entry>()
+  for (const e of allEntries.value) {
+    if (!e.catalogId) continue
+    const prev = latest.get(e.catalogId)
+    if (!prev || e.createdAt > prev.createdAt) latest.set(e.catalogId, e)
+  }
+  return new Map([...latest].map(([id, e]) => [id, e.grams]))
+})
+// «Моя версия» продукта из базы (этап 2.6) показывается вместо оригинала.
+const myVersionOf = computed(() => new Set(allFoods.value.map((f) => f.sourceCatalogId).filter(Boolean)))
+const catalogRows = computed(() =>
+  catalog.items.value
+    .filter((c) => !myVersionOf.value.has(c.id))
+    .map((c) => pickFromCatalog(c, lastGramsByCatalog.value.get(c.id) ?? null)),
 )
 
 // Поиск: все разделы сразу блоками, каждый продукт — один раз, в самом
-// верхнем блоке, где нашёлся (История → Продукты → Блюда → База; см.
-// README «Поиск»)
-const usedAfterHistory = computed(() => new Set(historyRows.value.map((e) => e.foodId!)))
-const productsSearchRows = computed(() => products.value.filter((f) => !usedAfterHistory.value.has(f.id)))
-const usedAfterProducts = computed(
-  () => new Set([...usedAfterHistory.value, ...productsSearchRows.value.map((f) => f.id)]),
-)
-const dishesSearchRows = computed(() => dishes.value.filter((f) => !usedAfterProducts.value.has(f.id)))
+// верхнем блоке, где нашёлся (История → Продукты → Блюда → База, README).
+const searchBlocks = computed(() => {
+  const used = new Set<string>()
+  const take = (rows: PickItem[]) => rows.filter((r) => !used.has(r.key) && (used.add(r.key), true))
+  const history = historyRows.value.filter((r) => !used.has(r.item.key) && (used.add(r.item.key), true))
+  return {
+    history,
+    products: take(productRows.value),
+    dishes: take(dishRows.value),
+    catalog: take(catalogRows.value),
+  }
+})
 
-// router.push на конкретный день, а не router.back(): экран добавления
-// может быть открыт без записи в истории браузера (прямая ссылка,
-// перезагрузка страницы) — back() в этом случае улетает в about:blank,
-// поймала на тесте.
-async function quickAdd(food: Food) {
-  await addEntryFromFood(food, props.date, target.value, food.lastGrams ?? 100)
+// router.push на конкретный день, а не router.back(): экран может быть
+// открыт без записи в истории браузера (прямая ссылка, перезагрузка) —
+// back() тогда улетает в about:blank, поймала на тесте.
+async function quickAdd(item: PickItem) {
+  await addEntry(item, props.date, target.value, item.lastGrams ?? 100)
   void router.push(`/day/${props.date}`)
 }
-function quickAddFromEntry(entry: Entry) {
-  if (!entry.foodId) return // из каталога — появится в этапе 2/3
-  const food = foodsById.value.get(entry.foodId)
-  if (food) void quickAdd(food)
-}
 
-const openingFood = ref<Food | null>(null)
-function openEntry(entry: Entry) {
-  if (!entry.foodId) return
-  const food = foodsById.value.get(entry.foodId)
-  if (food) openingFood.value = food
-}
+const opening = ref<PickItem | null>(null)
 
 const creatingKind = ref<'product' | 'dish' | null>(null)
 async function onFoodSaved(id: string, addNow: boolean) {
   creatingKind.value = null
   if (!addNow) return
   const food = await db.foods.get(id)
-  if (food) openingFood.value = food
+  if (food) opening.value = pickFromFood(food)
 }
 
 function afterAdd() {
-  openingFood.value = null
+  opening.value = null
   void router.push(`/day/${props.date}`)
 }
 
-// Множественный выбор — по обратной связи, не из README: отметить сразу
-// несколько строк (и с разных вкладок/блоков — состояние общее на весь
-// экран, не сбрасывается переключением вкладки) со своим весом у каждой,
-// добавить всё одним разом.
+// Множественный выбор (обратная связь): отметить сразу несколько строк —
+// с любых вкладок и блоков, в т.ч. из Базы, — у каждой свой вес, добавить
+// всё разом. Выбор общий на экран и не сбрасывается сменой вкладки.
 const selectMode = ref(false)
-const selection = ref(new Map<string, number>()) // foodId -> граммы
+const selection = ref(new Map<string, { item: PickItem; grams: number }>())
 const selectedCount = computed(() => selection.value.size)
 
 function toggleSelectMode() {
   selectMode.value = !selectMode.value
   if (!selectMode.value) selection.value = new Map()
 }
-function toggleSelect(foodId: string) {
+function toggleSelect(item: PickItem) {
   const next = new Map(selection.value)
-  if (next.has(foodId)) {
-    next.delete(foodId)
-  } else {
-    const food = foodsById.value.get(foodId)
-    next.set(foodId, food?.lastGrams ?? 100)
-  }
+  if (next.has(item.key)) next.delete(item.key)
+  else next.set(item.key, { item, grams: item.lastGrams ?? 100 })
   selection.value = next
 }
-function setSelectionGrams(foodId: string, grams: number) {
-  if (!selection.value.has(foodId)) return
+function setSelectionGrams(item: PickItem, grams: number) {
+  const cur = selection.value.get(item.key)
+  if (!cur) return
   const next = new Map(selection.value)
-  next.set(foodId, grams)
+  next.set(item.key, { ...cur, grams })
   selection.value = next
 }
-
 async function bulkAdd() {
-  for (const [foodId, grams] of selection.value) {
-    const food = foodsById.value.get(foodId)
-    if (food && grams > 0) await addEntryFromFood(food, props.date, target.value, grams)
+  for (const { item, grams } of selection.value.values()) {
+    if (grams > 0) await addEntry(item, props.date, target.value, grams)
   }
   selection.value = new Map()
   selectMode.value = false
   void router.push(`/day/${props.date}`)
+}
+
+function rowBind(item: PickItem) {
+  return {
+    selectable: selectMode.value,
+    selected: selection.value.has(item.key),
+    grams: selection.value.get(item.key)?.grams,
+  }
+}
+function rowOn(item: PickItem) {
+  return {
+    open: () => (opening.value = item),
+    add: () => void quickAdd(item),
+    toggle: () => toggleSelect(item),
+    'update:grams': (g: number) => setSelectionGrams(item, g),
+  }
+}
+function subtitleFor(item: PickItem): string | null {
+  return item.brand
 }
 </script>
 
@@ -188,130 +220,90 @@ async function bulkAdd() {
         <button type="button" @click="tab = 'history'" class="flex-1 py-2 rounded-xl" :class="tab === 'history' ? 'bg-accent text-white' : 'text-muted'">История</button>
         <button type="button" @click="tab = 'products'" class="flex-1 py-2 rounded-xl" :class="tab === 'products' ? 'bg-accent text-white' : 'text-muted'">Продукты</button>
         <button type="button" @click="tab = 'dishes'" class="flex-1 py-2 rounded-xl" :class="tab === 'dishes' ? 'bg-accent text-white' : 'text-muted'">Блюда</button>
-        <!-- База (каталог) — этап 2 -->
-        <button type="button" disabled class="flex-1 py-2 rounded-xl text-muted/40">База</button>
+        <button type="button" @click="tab = 'catalog'" class="flex-1 py-2 rounded-xl" :class="tab === 'catalog' ? 'bg-accent text-white' : 'text-muted'">База</button>
       </div>
     </header>
 
     <div class="flex-1 overflow-y-auto px-4 pb-6">
       <!-- Поиск: блоки по очереди, каждый продукт один раз -->
       <template v-if="searching">
-        <template v-if="historyRows.length">
+        <template v-if="searchBlocks.history.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">История</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
             <FoodListRow
-              v-for="entry in historyRows"
-              :key="entry.id"
-              :title="entry.name"
-              :trailing="`${entry.grams} г`"
-              :selectable="selectMode"
-              :selected="selection.has(entry.foodId!)"
-              :grams="selection.get(entry.foodId!)"
-              @open="openEntry(entry)"
-              @add="quickAddFromEntry(entry)"
-              @toggle="toggleSelect(entry.foodId!)"
-              @update:grams="setSelectionGrams(entry.foodId!, $event)"
+              v-for="row in searchBlocks.history"
+              :key="row.item.key"
+              :title="row.entry.name"
+              :trailing="`${row.entry.grams} г`"
+              v-bind="rowBind(row.item)"
+              v-on="rowOn(row.item)"
             />
           </div>
         </template>
-        <template v-if="productsSearchRows.length">
+        <template v-if="searchBlocks.products.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Продукты</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow
-              v-for="food in productsSearchRows"
-              :key="food.id"
-              :title="food.name"
-              :subtitle="food.brand"
-              :selectable="selectMode"
-              :selected="selection.has(food.id)"
-              :grams="selection.get(food.id)"
-              @open="openingFood = food"
-              @add="quickAdd(food)"
-              @toggle="toggleSelect(food.id)"
-              @update:grams="setSelectionGrams(food.id, $event)"
-            />
+            <FoodListRow v-for="item in searchBlocks.products" :key="item.key" :title="item.name" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
-        <template v-if="dishesSearchRows.length">
+        <template v-if="searchBlocks.dishes.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Блюда</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow
-              v-for="food in dishesSearchRows"
-              :key="food.id"
-              :title="food.name"
-              :selectable="selectMode"
-              :selected="selection.has(food.id)"
-              :grams="selection.get(food.id)"
-              @open="openingFood = food"
-              @add="quickAdd(food)"
-              @toggle="toggleSelect(food.id)"
-              @update:grams="setSelectionGrams(food.id, $event)"
-            />
+            <FoodListRow v-for="item in searchBlocks.dishes" :key="item.key" :title="item.name" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
-        <p v-if="!historyRows.length && !productsSearchRows.length && !dishesSearchRows.length" class="text-sm text-muted py-6 text-center">
+        <!-- База: без сети/входа блок не показываем (README), пока грузится — тихая подпись -->
+        <template v-if="searchBlocks.catalog.length">
+          <h3 class="text-xs text-muted mb-1.5 px-1">База</h3>
+          <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
+            <FoodListRow v-for="item in searchBlocks.catalog" :key="item.key" :title="item.name" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+          </div>
+        </template>
+        <p v-else-if="catalog.status.value === 'loading'" class="text-xs text-muted px-1 mb-4">База: ищу…</p>
+        <p
+          v-if="!searchBlocks.history.length && !searchBlocks.products.length && !searchBlocks.dishes.length && !searchBlocks.catalog.length && catalog.status.value !== 'loading'"
+          class="text-sm text-muted py-6 text-center"
+        >
           Ничего не нашлось
         </p>
-        <!-- База — этап 2, для нее нужен сервер -->
       </template>
 
-      <!-- Без поиска: вкладки. История — без дублей, последнее использование сверху -->
+      <!-- Без поиска: вкладки -->
       <template v-else-if="tab === 'history'">
         <div class="rounded-2xl bg-card border border-line overflow-hidden">
           <p v-if="historyRows.length === 0" class="px-4 py-3 text-sm text-muted">Пока пусто</p>
           <FoodListRow
-            v-for="entry in historyRows"
-            :key="entry.id"
-            :title="entry.name"
-            :trailing="`${entry.grams} г`"
-            :selectable="selectMode"
-            :selected="selection.has(entry.foodId!)"
-            :grams="selection.get(entry.foodId!)"
-            @open="openEntry(entry)"
-            @add="quickAddFromEntry(entry)"
-            @toggle="toggleSelect(entry.foodId!)"
-            @update:grams="setSelectionGrams(entry.foodId!, $event)"
+            v-for="row in historyRows"
+            :key="row.item.key"
+            :title="row.entry.name"
+            :trailing="`${row.entry.grams} г`"
+            v-bind="rowBind(row.item)"
+            v-on="rowOn(row.item)"
           />
         </div>
       </template>
 
       <template v-else-if="tab === 'products'">
         <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
-          <p v-if="products.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
-          <FoodListRow
-            v-for="food in products"
-            :key="food.id"
-            :title="food.name"
-            :subtitle="food.brand"
-            :selectable="selectMode"
-            :selected="selection.has(food.id)"
-            :grams="selection.get(food.id)"
-            @open="openingFood = food"
-            @add="quickAdd(food)"
-            @toggle="toggleSelect(food.id)"
-            @update:grams="setSelectionGrams(food.id, $event)"
-          />
+          <p v-if="productRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
+          <FoodListRow v-for="item in productRows" :key="item.key" :title="item.name" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
         <button type="button" @click="creatingKind = 'product'" class="text-sm text-accent px-1">+ Новый продукт</button>
       </template>
 
       <template v-else-if="tab === 'dishes'">
         <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
-          <p v-if="dishes.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
-          <FoodListRow
-            v-for="food in dishes"
-            :key="food.id"
-            :title="food.name"
-            :selectable="selectMode"
-            :selected="selection.has(food.id)"
-            :grams="selection.get(food.id)"
-            @open="openingFood = food"
-            @add="quickAdd(food)"
-            @toggle="toggleSelect(food.id)"
-            @update:grams="setSelectionGrams(food.id, $event)"
-          />
+          <p v-if="dishRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
+          <FoodListRow v-for="item in dishRows" :key="item.key" :title="item.name" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
         <button type="button" @click="creatingKind = 'dish'" class="text-sm text-accent px-1">+ Новое блюдо</button>
+      </template>
+
+      <!-- База без запроса: сам каталог — сотни тысяч строк, листать нечего, только искать -->
+      <template v-else-if="tab === 'catalog'">
+        <p class="text-sm text-muted px-1 py-4">
+          Начните вводить название — ищем по базе продуктов: базовые продукты и покупные из Open Food Facts.
+        </p>
       </template>
     </div>
 
@@ -330,7 +322,7 @@ async function bulkAdd() {
     </div>
 
     <MealTargetSheet v-if="pickingTarget" :date="date" @close="pickingTarget = false" @pick="pickTarget" />
-    <AddEntrySheet v-if="openingFood" :food="openingFood" :date="date" :target="target" @close="openingFood = null" @added="afterAdd" />
+    <AddEntrySheet v-if="opening" :item="opening" :date="date" :target="target" @close="opening = null" @added="afterAdd" />
     <FoodFormSheet v-if="creatingKind" :kind="creatingKind" @close="creatingKind = null" @saved="onFoodSaved" />
   </div>
 </template>
