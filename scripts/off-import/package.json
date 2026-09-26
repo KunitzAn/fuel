@@ -1,0 +1,12 @@
+{
+  "name": "fuel-off-import",
+  "private": true,
+  "type": "module",
+  "description": "Импорт среза Open Food Facts в fuel-catalog. Отдельно от приложения, чтобы DuckDB не тянулся в сборку Cloudflare.",
+  "scripts": {
+    "import": "node import.mjs"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "^1.4.1-r.2"
+  }
+}
