@@ -31,6 +31,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
   const items = await db
     .select({
       id: catalogProducts.id,
+      barcode: catalogProducts.barcode,
       name: catalogProducts.name,
       brand: catalogProducts.brand,
       protein: catalogProducts.protein,

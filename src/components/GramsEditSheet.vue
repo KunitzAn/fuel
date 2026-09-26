@@ -8,6 +8,7 @@ import FoodFormSheet from './FoodFormSheet.vue'
 import { db, type Entry, type Food } from '../lib/db'
 import { softDeleteEntry, updateEntryGrams } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
+import { pickFromEntry, type PickItem } from '../lib/pick'
 
 const props = defineProps<{ entry: Entry }>()
 const emit = defineEmits<{ close: [] }>()
@@ -16,14 +17,21 @@ const emit = defineEmits<{ close: [] }>()
 // entry от этого не меняется (README «Правка и удаление» — прошлые дни
 // не трогаем), поэтому после правки просто закрываем шторку с формой, а
 // не пытаемся обновить цифры на экране.
-const editingFood = ref<Food | null>(null)
+// Запись из базы (catalogId) — карандаш ведёт к «моей версии» (этап 2.6),
+// а если она уже есть — к её правке, а не к ещё одной копии.
+const editing = ref<{ food?: Food; base?: PickItem } | null>(null)
 async function openFoodEdit() {
-  if (!props.entry.foodId) return
-  const food = await db.foods.get(props.entry.foodId)
-  if (food) editingFood.value = food
+  const { foodId, catalogId } = props.entry
+  const food = foodId
+    ? await db.foods.get(foodId)
+    : catalogId
+      ? await db.foods.filter((f) => f.sourceCatalogId === catalogId && !f.deletedAt).first()
+      : undefined
+  if (food) editing.value = { food }
+  else if (catalogId) editing.value = { base: pickFromEntry(props.entry, new Map())! }
 }
 function onFoodDeleted() {
-  editingFood.value = null
+  editing.value = null
   emit('close')
 }
 
@@ -66,7 +74,7 @@ async function remove() {
           </p>
         </div>
         <button
-          v-if="entry.foodId"
+          v-if="entry.foodId || entry.catalogId"
           type="button"
           aria-label="Изменить продукт"
           @click="openFoodEdit"
@@ -115,11 +123,12 @@ async function remove() {
     </div>
 
     <FoodFormSheet
-      v-if="editingFood"
-      :kind="editingFood.kind"
-      :food="editingFood"
-      @close="editingFood = null"
-      @saved="editingFood = null"
+      v-if="editing"
+      :kind="editing.food?.kind ?? 'product'"
+      :food="editing.food"
+      :base="editing.base"
+      @close="editing = null"
+      @saved="editing = null"
       @deleted="onFoodDeleted"
     />
   </div>

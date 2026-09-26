@@ -4,9 +4,10 @@
 // выбора приёма, а здесь приём — часть решения.
 import { ChevronDown, Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
+import { db } from '../lib/db'
 import { addEntry, targetLabel, type MealTarget } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
-import type { PickItem } from '../lib/pick'
+import { pickFromFood, type PickItem } from '../lib/pick'
 import FoodFormSheet from './FoodFormSheet.vue'
 import MealTargetSheet from './MealTargetSheet.vue'
 
@@ -45,9 +46,19 @@ async function add() {
   emit('added')
 }
 
-function onFoodSaved() {
+// Своё править — продукт; продукт из базы — «моя версия» (этап 2.6).
+// «Сохранить и добавить» сразу кладёт в дневник уже исправленный продукт с
+// граммами из этого окна; просто «Сохранить» — закрываем, список за окном
+// живой и уже показывает новое.
+async function onFoodSaved(id: string, addNow: boolean) {
   editingFood.value = false
-  emit('close')
+  const food = addNow ? await db.foods.get(id) : undefined
+  if (food && grams.value > 0) {
+    await addEntry(pickFromFood(food), props.date, target.value, grams.value)
+    emit('added')
+  } else {
+    emit('close')
+  }
 }
 function onFoodDeleted() {
   editingFood.value = false
@@ -69,9 +80,9 @@ function onFoodDeleted() {
             на 100 г: Б {{ per100.protein }} · Ж {{ per100.fat }} · У {{ per100.carbs }} · {{ Math.round(per100.kcal) }} ккал
           </p>
         </div>
-        <!-- Править можно только свой продукт; продукт каталога — «моя версия», этап 2.6 -->
+        <!-- Свой продукт — правка; продукт из базы — «моя версия» (этап 2.6) -->
         <button
-          v-if="item.food"
+          v-if="item.food || item.catalogId"
           type="button"
           aria-label="Изменить продукт"
           @click="editingFood = true"
@@ -119,9 +130,10 @@ function onFoodDeleted() {
 
     <MealTargetSheet v-if="pickingTarget" :date="date" @close="pickingTarget = false" @pick="pickTarget" />
     <FoodFormSheet
-      v-if="editingFood && item.food"
-      :kind="item.food.kind"
-      :food="item.food"
+      v-if="editingFood"
+      :kind="item.food?.kind ?? 'product'"
+      :food="item.food ?? undefined"
+      :base="item.food ? undefined : item"
       @close="editingFood = false"
       @saved="onFoodSaved"
       @deleted="onFoodDeleted"

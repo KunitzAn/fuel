@@ -15,13 +15,14 @@ export interface FoodDraft {
   note: string | null
 }
 
-export async function createFood(draft: FoodDraft): Promise<string> {
+/** sourceCatalogId — «моя версия» продукта из базы (этап 2.6), иначе null. */
+export async function createFood(draft: FoodDraft, sourceCatalogId: string | null = null): Promise<string> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   await db.foods.add({
     id,
     ...draft,
-    sourceCatalogId: null,
+    sourceCatalogId,
     lastGrams: null,
     createdAt: now,
     updatedAt: now,

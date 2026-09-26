@@ -1,10 +1,13 @@
 <script setup lang="ts">
-// Форма продукта/блюда — и создание, и правка (README «Форма продукта» /
-// «Форма блюда» + правка по обратной связи). Полноэкранная, а не шторка
-// снизу — полей слишком много для шторки.
+// Форма продукта/блюда (README «Форма продукта» / «Форма блюда»). Три
+// режима: новый; правка своего (`food`, по обратной связи); «моя версия»
+// продукта из базы (`base` с catalogId, этап 2.6) — поля из каталога,
+// сохраняется как свой продукт со ссылкой sourceCatalogId, сам каталог не
+// меняется. Полноэкранная, а не шторка — полей слишком много для шторки.
 import { ArrowLeft } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import type { Food } from '../lib/db'
+import type { PickItem } from '../lib/pick'
 import {
   createFood,
   kcalFromMacros,
@@ -15,23 +18,27 @@ import {
   updateFood,
 } from '../lib/foods'
 
-const props = defineProps<{ kind: 'product' | 'dish'; food?: Food }>()
+const props = defineProps<{ kind: 'product' | 'dish'; food?: Food; base?: PickItem }>()
 const emit = defineEmits<{ close: []; saved: [foodId: string, addNow: boolean]; deleted: [] }>()
 
 const isEdit = computed(() => !!props.food)
+// Новая «моя версия» — или правка уже существующей
+const isVersion = computed(() => (props.food ? !!props.food.sourceCatalogId : !!props.base?.catalogId))
 
-const name = ref(props.food?.name ?? '')
-const brand = ref(props.food?.brand ?? '')
-const barcode = ref(props.food?.barcode ?? '')
+// Откуда заполнять поля: свой продукт при правке, иначе продукт из базы
+const src = props.food ?? props.base
+const name = ref(src?.name ?? '')
+const brand = ref(src?.brand ?? '')
+const barcode = ref(src?.barcode ?? '')
 const note = ref(props.food?.note ?? '')
 // Хранится всегда на 100 г — при правке нет смысла угадывать, вводили ли
 // когда-то «на порцию», просто показываем уже пересчитанное.
 const servingMode = ref<'per100' | 'perServing'>('per100')
 const servingGramsInput = ref('')
-const proteinInput = ref(props.food ? String(props.food.protein) : '')
-const fatInput = ref(props.food ? String(props.food.fat) : '')
-const carbsInput = ref(props.food ? String(props.food.carbs) : '')
-const kcalInput = ref(props.food ? String(props.food.kcal) : '')
+const proteinInput = ref(src ? String(src.protein) : '')
+const fatInput = ref(src ? String(src.fat) : '')
+const carbsInput = ref(src ? String(src.carbs) : '')
+const kcalInput = ref(src ? String(src.kcal) : '')
 
 const servingGrams = computed(() => parseDecimal(servingGramsInput.value) ?? 0)
 const protein = computed(() => parseDecimal(proteinInput.value) ?? 0)
@@ -85,7 +92,7 @@ async function save(addNow: boolean) {
     id = props.food.id
     await updateFood(id, draft)
   } else {
-    id = await createFood(draft)
+    id = await createFood(draft, props.base?.catalogId ?? null)
   }
   emit('saved', id, addNow)
 }
@@ -107,11 +114,21 @@ async function remove() {
         <ArrowLeft :size="20" />
       </button>
       <h1 class="text-lg font-semibold text-ink">
-        {{ isEdit ? (kind === 'product' ? 'Продукт' : 'Блюдо') : kind === 'product' ? 'Новый продукт' : 'Новое блюдо' }}
+        {{
+          isVersion
+            ? 'Моя версия'
+            : isEdit
+              ? kind === 'product' ? 'Продукт' : 'Блюдо'
+              : kind === 'product' ? 'Новый продукт' : 'Новое блюдо'
+        }}
       </h1>
     </header>
 
     <div class="flex-1 overflow-y-auto px-4 pb-6 flex flex-col gap-4">
+      <p v-if="isVersion" class="text-xs text-muted">
+        Ваша копия продукта из базы: правки видите только вы, в поиске она будет вместо оригинала (с пометкой ✎).
+        В самой базе продукт остаётся как был.
+      </p>
       <label class="flex flex-col gap-1">
         <span class="text-xs text-muted">Название*</span>
         <input v-model="name" type="text" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />

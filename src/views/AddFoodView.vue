@@ -41,6 +41,11 @@ const searching = computed(() => query.value.trim().length > 0)
 const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === null).toArray(), [])
 const allFoods = useLiveQuery(() => db.foods.filter((f) => f.deletedAt === null).toArray(), [])
 const foodsById = computed(() => new Map(allFoods.value.map((f) => [f.id, f])))
+// «Моя версия» продукта из базы (этап 2.6) показывается вместо оригинала —
+// и в Истории, и в блоке «База»
+const myVersionByCatalog = computed(
+  () => new Map(allFoods.value.filter((f) => f.sourceCatalogId).map((f) => [f.sourceCatalogId!, f])),
+)
 
 // История — без дублей: один продукт один раз, последний использованный
 // сверху, с последними граммами (обратная связь; README был по дням).
@@ -53,10 +58,17 @@ const historyRows = computed(() => {
     const prev = latest.get(key)
     if (!prev || e.createdAt > prev.createdAt) latest.set(key, e)
   }
+  // Запись с оригиналом из базы, а у меня уже есть «моя версия» — в Истории
+  // показываем версию (этап 2.6: «мой вариант вместо оригинала»). Тогда два
+  // ключа могут схлопнуться в один продукт — оставляем более свежий.
+  const seen = new Set<string>()
   return [...latest.values()]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((e) => ({ entry: e, item: pickFromEntry(e, foodsById.value) }))
-    .filter((r): r is { entry: Entry; item: PickItem } => r.item !== null)
+    .map((e) => {
+      const version = !e.foodId && e.catalogId ? myVersionByCatalog.value.get(e.catalogId) : undefined
+      return { entry: e, item: version ? pickFromFood(version) : pickFromEntry(e, foodsById.value) }
+    })
+    .filter((r): r is { entry: Entry; item: PickItem } => r.item !== null && !seen.has(r.item.key) && (seen.add(r.item.key), true))
 })
 
 const productRows = computed(() =>
@@ -84,11 +96,9 @@ const lastGramsByCatalog = computed(() => {
   }
   return new Map([...latest].map(([id, e]) => [id, e.grams]))
 })
-// «Моя версия» продукта из базы (этап 2.6) показывается вместо оригинала.
-const myVersionOf = computed(() => new Set(allFoods.value.map((f) => f.sourceCatalogId).filter(Boolean)))
 const catalogRows = computed(() =>
   catalog.items.value
-    .filter((c) => !myVersionOf.value.has(c.id))
+    .filter((c) => !myVersionByCatalog.value.has(c.id))
     .map((c) => pickFromCatalog(c, lastGramsByCatalog.value.get(c.id) ?? null)),
 )
 
@@ -180,6 +190,10 @@ function rowOn(item: PickItem) {
 function subtitleFor(item: PickItem): string | null {
   return item.brand
 }
+// ✎ — своя версия продукта из базы (README «Мои версии продуктов из базы»)
+function titleFor(item: PickItem): string {
+  return item.food?.sourceCatalogId ? `${item.name} ✎` : item.name
+}
 </script>
 
 <template>
@@ -233,7 +247,7 @@ function subtitleFor(item: PickItem): string | null {
             <FoodListRow
               v-for="row in searchBlocks.history"
               :key="row.item.key"
-              :title="row.entry.name"
+              :title="titleFor(row.item)"
               :trailing="`${row.entry.grams} г`"
               v-bind="rowBind(row.item)"
               v-on="rowOn(row.item)"
@@ -243,20 +257,20 @@ function subtitleFor(item: PickItem): string | null {
         <template v-if="searchBlocks.products.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Продукты</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow v-for="item in searchBlocks.products" :key="item.key" :title="item.name" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+            <FoodListRow v-for="item in searchBlocks.products" :key="item.key" :title="titleFor(item)" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <template v-if="searchBlocks.dishes.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Блюда</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow v-for="item in searchBlocks.dishes" :key="item.key" :title="item.name" v-bind="rowBind(item)" v-on="rowOn(item)" />
+            <FoodListRow v-for="item in searchBlocks.dishes" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <!-- База: без сети/входа блок не показываем (README), пока грузится — тихая подпись -->
         <template v-if="searchBlocks.catalog.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">База</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow v-for="item in searchBlocks.catalog" :key="item.key" :title="item.name" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+            <FoodListRow v-for="item in searchBlocks.catalog" :key="item.key" :title="titleFor(item)" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <p v-else-if="catalog.status.value === 'loading'" class="text-xs text-muted px-1 mb-4">База: ищу…</p>
@@ -275,7 +289,7 @@ function subtitleFor(item: PickItem): string | null {
           <FoodListRow
             v-for="row in historyRows"
             :key="row.item.key"
-            :title="row.entry.name"
+            :title="titleFor(row.item)"
             :trailing="`${row.entry.grams} г`"
             v-bind="rowBind(row.item)"
             v-on="rowOn(row.item)"
@@ -286,7 +300,7 @@ function subtitleFor(item: PickItem): string | null {
       <template v-else-if="tab === 'products'">
         <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
           <p v-if="productRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
-          <FoodListRow v-for="item in productRows" :key="item.key" :title="item.name" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+          <FoodListRow v-for="item in productRows" :key="item.key" :title="titleFor(item)" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
         <button type="button" @click="creatingKind = 'product'" class="text-sm text-accent px-1">+ Новый продукт</button>
       </template>
@@ -294,7 +308,7 @@ function subtitleFor(item: PickItem): string | null {
       <template v-else-if="tab === 'dishes'">
         <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
           <p v-if="dishRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
-          <FoodListRow v-for="item in dishRows" :key="item.key" :title="item.name" v-bind="rowBind(item)" v-on="rowOn(item)" />
+          <FoodListRow v-for="item in dishRows" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
         <button type="button" @click="creatingKind = 'dish'" class="text-sm text-accent px-1">+ Новое блюдо</button>
       </template>

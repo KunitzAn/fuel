@@ -9,6 +9,7 @@ import type { Entry, Food } from './db'
 
 export interface CatalogItem {
   id: string // 'basic:…' | 'off:…'
+  barcode: string | null
   name: string
   brand: string | null
   protein: number
@@ -25,6 +26,8 @@ export interface PickItem {
   catalogId: string | null
   name: string
   brand: string | null
+  /** Переносится в «мою версию» — сканер (этап 3) сначала ищет штрихкод среди своих. */
+  barcode: string | null
   protein: number // на 100 г
   fat: number
   carbs: number
@@ -45,6 +48,7 @@ export function pickFromFood(food: Food): PickItem {
     catalogId: null,
     name: food.name,
     brand: food.brand,
+    barcode: food.barcode,
     protein: food.protein,
     fat: food.fat,
     carbs: food.carbs,
@@ -62,6 +66,7 @@ export function pickFromCatalog(item: CatalogItem, lastGrams: number | null): Pi
     catalogId: item.id,
     name: item.name,
     brand: item.brand,
+    barcode: item.barcode,
     protein: item.protein,
     fat: item.fat,
     carbs: item.carbs,
@@ -86,6 +91,7 @@ export function pickFromEntry(entry: Entry, foodsById: Map<string, Food>): PickI
     catalogId: entry.catalogId,
     name: entry.name,
     brand: entry.brand,
+    barcode: null,
     protein: entry.protein,
     fat: entry.fat,
     carbs: entry.carbs,
