@@ -44,8 +44,11 @@ const COUNTRIES = [
   'russia', 'vietnam', 'thailand', 'japan', 'south-korea', 'china', 'taiwan',
   'hong-kong', 'indonesia', 'malaysia', 'singapore', 'philippines', 'cambodia', 'laos',
 ].map((c) => `en:${c}`)
-// Приоритет языка названия: русское → основное → английское → любое
-const NAME_LANGS = ['ru', 'main', 'en']
+// Приоритет языка названия: русское → английское → основное (местное) →
+// любое. Английское раньше местного — решение владельца (отступление от
+// README): вьетнамское/тайское название не прочитать, английское понятно.
+// Искать можно по любому — в search лежат все варианты.
+const NAME_LANGS = ['ru', 'en', 'main']
 // Free tier Neon — 0,5 ГБ на проект; оставляем запас под базовые продукты и рост
 const SIZE_LIMIT_MB = 350
 
