@@ -76,10 +76,22 @@ const reader = await duck.runAndReadAll(`
 const raw = reader.getRowObjectsJS()
 console.log(`Товаров в наших странах с заполненными Б/Ж/У: ${raw.length} (${Math.round((Date.now() - t0) / 1000)} с)`)
 
+// В самих данных OFF кавычки бывают HTML-экранированы (~1 тыс. строк в
+// наших странах: «ООО &quot;Дейри Фуд&quot;») — раскодируем
+const ENTITIES = { quot: '"', amp: '&', apos: "'", lt: '<', gt: '>', nbsp: ' ' }
+function decodeEntities(s) {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-z]+);/gi, (m, name) => ENTITIES[name.toLowerCase()] ?? m)
+}
+
 const products = []
 const skipped = { noName: 0, badMacros: 0 }
 for (const r of raw) {
-  const names = (r.product_name ?? []).filter((n) => n?.text?.trim())
+  const names = (r.product_name ?? [])
+    .filter((n) => n?.text?.trim())
+    .map((n) => ({ ...n, text: decodeEntities(n.text) }))
   const pick = NAME_LANGS.map((l) => names.find((n) => n.lang === l)).find(Boolean) ?? names[0]
   if (!pick) { skipped.noName++; continue }
   const protein = Number(r.protein), fat = Number(r.fat), carbs = Number(r.carbs)
@@ -89,7 +101,7 @@ for (const r of raw) {
   let kcal = r.kcal == null ? NaN : Number(r.kcal)
   if (!Number.isFinite(kcal) || kcal < 0 || kcal > 950) kcal = protein * 4 + fat * 9 + carbs * 4 // README: нет ккал — из БЖУ
   if (bad) { skipped.badMacros++; continue }
-  const brand = r.brands?.split(',')[0]?.trim() || null
+  const brand = r.brands ? decodeEntities(r.brands).split(',')[0]?.trim() || null : null
   products.push({
     id: `off:${r.code}`,
     barcode: r.code,

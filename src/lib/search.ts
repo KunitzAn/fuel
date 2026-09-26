@@ -11,11 +11,17 @@
  * в названии или марке, в любом порядке («грудка куриная» → «Куриная грудка»).
  */
 export function normalizeForSearch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/йо/g, 'е')
-    .replace(/[.,]/g, '')
+  return (
+    text
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/йо/g, 'е')
+      // Диакритика не важна: «ca phe» → «Cà phê sữa» (см. db/searchText.ts)
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .replace(/đ/g, 'd')
+      .replace(/[.,]/g, '')
+  )
 }
 
 export function matchesQuery(query: string, ...fields: (string | null | undefined)[]): boolean {
