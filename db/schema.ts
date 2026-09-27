@@ -1,4 +1,4 @@
-import { index, integer, pgTable, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -146,9 +146,52 @@ export const goalSettings = pgTable(
     perHundredProtein: real('per_hundred_protein').notNull(),
     perHundredFat: real('per_hundred_fat').notNull(),
     perHundredCarbs: real('per_hundred_carbs').notNull(),
+    // Поправка для типа дня (этап 4.4, не из README — новая мысль
+    // владелицы) — та же версия, что и база: правка действует с
+    // сегодняшнего дня. High — прибавка, low хранится как положительная
+    // величина «убавки» (см. src/lib/goals.ts → manualDayTypeDelta).
+    highDeltaProtein: real('high_delta_protein').notNull().default(0),
+    highDeltaFat: real('high_delta_fat').notNull().default(0),
+    highDeltaCarbs: real('high_delta_carbs').notNull().default(0),
+    lowDeltaProtein: real('low_delta_protein').notNull().default(0),
+    lowDeltaFat: real('low_delta_fat').notNull().default(0),
+    lowDeltaCarbs: real('low_delta_carbs').notNull().default(0),
     ...syncColumns,
   },
   (t) => [index('goal_settings_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
+)
+
+/**
+ * Тип дня — план с утра и факт в конце дня, независимо друг от друга
+ * (этап 4.4). В отличие от других таблиц — без синтетического `id`:
+ * настоящий ключ строки — дата (один тип на календарный день, правится на
+ * месте, а не версионируется), поэтому первичный ключ составной
+ * (`userId`, `date`) и одинаков на любом устройстве без координации.
+ *
+ * `plannedDelta*` — снимок поправки на момент простановки плана (что
+ * вручную в настройках, что среднее по статистике) — не пересчитывается
+ * потом сам: иначе ориентир на день дрейфовал бы, если статистика
+ * изменится за день, пока он идёт.
+ */
+export const dayTypes = pgTable(
+  'day_types',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(),
+    planned: text('planned'), // 'low' | 'high' | null
+    plannedSource: text('planned_source'), // 'manual' | 'stats' | null
+    plannedDeltaProtein: real('planned_delta_protein'),
+    plannedDeltaFat: real('planned_delta_fat'),
+    plannedDeltaCarbs: real('planned_delta_carbs'),
+    actual: text('actual'), // 'low' | 'high' | null — по факту, в конце дня
+    ...syncColumns,
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.date] }),
+    index('day_types_user_sync_idx').on(t.userId, t.serverUpdatedAt),
+  ],
 )
 
 /** Записи дневника — снимок КБЖУ на момент добавления, правка продукта их не меняет. */

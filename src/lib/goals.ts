@@ -1,10 +1,12 @@
 /**
- * Расчёт цели дня (README «Цели и энергия»). Единственное место в проекте,
- * где юнит-тесты обязательны (PLAN.md, этап 4.2) — формулы легко тихо
- * сломать, а рефакторить их будем не глядя на экран каждый раз.
+ * Расчёт цели дня (README «Цели и энергия», плюс этап 4.4 — тип дня, не из
+ * README). Единственное место в проекте, где юнит-тесты обязательны
+ * (PLAN.md, этап 4.2) — формулы легко тихо сломать, а рефакторить их будем
+ * не глядя на экран каждый раз.
  */
-import { kcalFromMacros } from './nutrition'
-import type { Activity, GoalSettings } from './db'
+import { shiftDate } from './date'
+import type { Activity, DayType, Entry, GoalSettings } from './db'
+import { kcalFromMacros, scaleByGrams, sumMacros, type Macros } from './nutrition'
 
 export interface GoalInput {
   baseProtein: number
@@ -14,6 +16,12 @@ export interface GoalInput {
   perHundredProtein: number
   perHundredFat: number
   perHundredCarbs: number
+  highDeltaProtein: number
+  highDeltaFat: number
+  highDeltaCarbs: number
+  lowDeltaProtein: number
+  lowDeltaFat: number
+  lowDeltaCarbs: number
 }
 
 export interface DayGoal {
@@ -94,4 +102,77 @@ export function pickGoalSettingsForDate<T extends Pick<GoalSettings, 'validFrom'
     }
   }
   return best
+}
+
+/**
+ * Тип дня (этап 4.4, новая мысль владелицы, не из README): высоко-/
+ * низкоуглеводный день, отдельно от целей по активности — поправка
+ * складывается с базой параллельно поправке на активность, а не заменяет
+ * её. Низкоуглеводный хранится в настройках как положительная «убавка»,
+ * здесь превращается в отрицательную поправку.
+ */
+export type DayTypeKind = 'low' | 'high'
+
+export interface DayTypeDelta {
+  protein: number
+  fat: number
+  carbs: number
+}
+
+/** Поправка «вручную» — из текущей версии настроек (та же, что база). */
+export function manualDayTypeDelta(kind: DayTypeKind, settings: GoalInput): DayTypeDelta {
+  if (kind === 'high') {
+    return { protein: settings.highDeltaProtein, fat: settings.highDeltaFat, carbs: settings.highDeltaCarbs }
+  }
+  return { protein: -settings.lowDeltaProtein, fat: -settings.lowDeltaFat, carbs: -settings.lowDeltaCarbs }
+}
+
+/**
+ * Поправка «из статистики» — среднее КБЖУ по факту прошлых дней этого же
+ * типа минус текущая база: получившееся число складывается с базой точно
+ * так же, как и вручную заданная поправка (владелица: «складывается с
+ * базовой целью параллельно поправке на активность»). Сегодняшний день (и
+ * будущие) в расчёт не берём — у него ещё не может быть факта. Дни без
+ * единой записи в `entries` из среднего исключаются (иначе занизили бы
+ * его нулём, хотя на самом деле просто не открывала приложение).
+ */
+export function statsDayTypeDelta(
+  kind: DayTypeKind,
+  base: Pick<GoalInput, 'baseProtein' | 'baseFat' | 'baseCarbs'>,
+  entries: Pick<Entry, 'date' | 'protein' | 'fat' | 'carbs' | 'kcal' | 'grams'>[],
+  dayTypeRows: Pick<DayType, 'date' | 'actual'>[],
+  periodDays: number | null,
+  today: string,
+): DayTypeDelta | null {
+  const cutoff = periodDays !== null ? shiftDate(today, -periodDays) : null
+  const matchingDates = new Set(
+    dayTypeRows.filter((d) => d.actual === kind && d.date < today && (!cutoff || d.date >= cutoff)).map((d) => d.date),
+  )
+  if (matchingDates.size === 0) return null
+
+  const totalsByDate = new Map<string, Macros>()
+  for (const e of entries) {
+    if (!matchingDates.has(e.date)) continue
+    const scaled = scaleByGrams(e, e.grams)
+    const prev = totalsByDate.get(e.date)
+    totalsByDate.set(e.date, prev ? sumMacros([prev, scaled]) : scaled)
+  }
+  const days = [...totalsByDate.values()]
+  if (days.length === 0) return null
+
+  const avg = sumMacros(days)
+  return {
+    protein: avg.protein / days.length - base.baseProtein,
+    fat: avg.fat / days.length - base.baseFat,
+    carbs: avg.carbs / days.length - base.baseCarbs,
+  }
+}
+
+/** Складывает поправку типа дня с уже посчитанной (активностью) целью — независимые слагаемые. */
+export function applyDayTypeDelta(goal: DayGoal, delta: DayTypeDelta | null): DayGoal {
+  if (!delta) return goal
+  const protein = goal.protein + delta.protein
+  const fat = goal.fat + delta.fat
+  const carbs = goal.carbs + delta.carbs
+  return { ...goal, protein, fat, carbs, kcal: kcalFromMacros(protein, fat, carbs) }
 }

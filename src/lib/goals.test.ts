@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { computeDayGoal, energyDifference, pickGoalSettingsForDate, sumActivityKcal } from './goals'
+import {
+  applyDayTypeDelta,
+  computeDayGoal,
+  energyDifference,
+  manualDayTypeDelta,
+  pickGoalSettingsForDate,
+  statsDayTypeDelta,
+  sumActivityKcal,
+} from './goals'
 
 const settings = {
   baseProtein: 120,
@@ -9,6 +17,12 @@ const settings = {
   perHundredProtein: 0,
   perHundredFat: 0,
   perHundredCarbs: 18,
+  highDeltaProtein: 0,
+  highDeltaFat: 0,
+  highDeltaCarbs: 90,
+  lowDeltaProtein: 0,
+  lowDeltaFat: 0,
+  lowDeltaCarbs: 60,
 }
 
 describe('computeDayGoal', () => {
@@ -99,5 +113,79 @@ describe('pickGoalSettingsForDate', () => {
 
   it('нет ни одной версии — null', () => {
     expect(pickGoalSettingsForDate([], '2026-01-10')).toBeNull()
+  })
+})
+
+describe('manualDayTypeDelta', () => {
+  it('высокоуглеводный — прибавка как задана в настройках', () => {
+    expect(manualDayTypeDelta('high', settings)).toEqual({ protein: 0, fat: 0, carbs: 90 })
+  })
+
+  it('низкоуглеводный — убавка (хранится как положительная величина, применяется с минусом)', () => {
+    expect(manualDayTypeDelta('low', settings)).toEqual({ protein: -0, fat: -0, carbs: -60 })
+  })
+})
+
+describe('applyDayTypeDelta', () => {
+  it('складывается с уже посчитанной целью, пересчитывает ккал', () => {
+    const goal = computeDayGoal(settings, 0)
+    const withDelta = applyDayTypeDelta(goal, { protein: 0, fat: 0, carbs: 90 })
+    expect(withDelta.carbs).toBe(240)
+    expect(withDelta.kcal).toBe(120 * 4 + 60 * 9 + 240 * 4)
+    // spentKcal — не по этой стороне: тип дня не про расход, только про цель БЖУ
+    expect(withDelta.spentKcal).toBe(goal.spentKcal)
+  })
+
+  it('delta = null — цель не меняется', () => {
+    const goal = computeDayGoal(settings, 0)
+    expect(applyDayTypeDelta(goal, null)).toEqual(goal)
+  })
+})
+
+describe('statsDayTypeDelta', () => {
+  const base = { baseProtein: 120, baseFat: 60, baseCarbs: 150 }
+  const entry = (date: string, carbs: number) => ({ date, protein: 0, fat: 0, carbs, kcal: carbs * 4, grams: 100 })
+
+  it('среднее по факту прошлых high-дней минус база', () => {
+    const dayTypeRows = [
+      { date: '2026-01-05', actual: 'high' as const },
+      { date: '2026-01-06', actual: 'high' as const },
+      { date: '2026-01-07', actual: 'low' as const },
+    ]
+    // 05.01: 260г угля (одна запись на 100г), 06.01: 220г
+    const entries = [entry('2026-01-05', 260), entry('2026-01-06', 220), entry('2026-01-07', 40)]
+    const delta = statsDayTypeDelta('high', base, entries, dayTypeRows, null, '2026-01-10')
+    expect(delta).not.toBeNull()
+    expect(delta!.carbs).toBeCloseTo((260 + 220) / 2 - 150) // = 90
+  })
+
+  it('сегодняшний день не в счёт — у него ещё нет факта', () => {
+    const dayTypeRows = [{ date: '2026-01-10', actual: 'high' as const }]
+    const entries = [entry('2026-01-10', 500)]
+    expect(statsDayTypeDelta('high', base, entries, dayTypeRows, null, '2026-01-10')).toBeNull()
+  })
+
+  it('день без единой записи в дневнике не портит среднее нулём', () => {
+    const dayTypeRows = [
+      { date: '2026-01-05', actual: 'high' as const },
+      { date: '2026-01-06', actual: 'high' as const }, // не открывала приложение в этот день
+    ]
+    const entries = [entry('2026-01-05', 260)]
+    const delta = statsDayTypeDelta('high', base, entries, dayTypeRows, null, '2026-01-10')
+    expect(delta!.carbs).toBeCloseTo(260 - 150) // = 110, не (260+0)/2
+  })
+
+  it('период ограничивает выборку', () => {
+    const dayTypeRows = [
+      { date: '2025-01-01', actual: 'high' as const }, // старый, за периодом
+      { date: '2026-01-05', actual: 'high' as const },
+    ]
+    const entries = [entry('2025-01-01', 400), entry('2026-01-05', 260)]
+    const delta = statsDayTypeDelta('high', base, entries, dayTypeRows, 30, '2026-01-10')
+    expect(delta!.carbs).toBeCloseTo(260 - 150) // только январский день
+  })
+
+  it('нет ни одного прошлого дня этого типа — null', () => {
+    expect(statsDayTypeDelta('high', base, [], [], null, '2026-01-10')).toBeNull()
   })
 })

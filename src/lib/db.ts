@@ -72,7 +72,11 @@ export interface Activity {
   dirty: boolean
 }
 
-/** Версия настроек целей, действует с `validFrom` (README «История настроек целей»). */
+/**
+ * Версия настроек целей, действует с `validFrom` (README «История настроек
+ * целей»). `high/lowDelta*` — поправка для типа дня (этап 4.4, не из
+ * README) — та же версия, что и база.
+ */
 export interface GoalSettings {
   id: string
   validFrom: string // YYYY-MM-DD
@@ -83,6 +87,32 @@ export interface GoalSettings {
   perHundredProtein: number
   perHundredFat: number
   perHundredCarbs: number
+  highDeltaProtein: number
+  highDeltaFat: number
+  highDeltaCarbs: number
+  lowDeltaProtein: number
+  lowDeltaFat: number
+  lowDeltaCarbs: number
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+  dirty: boolean
+}
+
+/**
+ * Тип дня — план с утра, факт в конце (этап 4.4). Ключ — сама дата, не
+ * синтетический id: один тип на календарный день, правится на месте (см.
+ * db/schema.ts). `plannedDelta*` — снимок поправки на момент простановки
+ * плана, не пересчитывается потом (src/lib/goals.ts).
+ */
+export interface DayType {
+  date: string
+  planned: 'low' | 'high' | null
+  plannedSource: 'manual' | 'stats' | null
+  plannedDeltaProtein: number | null
+  plannedDeltaFat: number | null
+  plannedDeltaCarbs: number | null
+  actual: 'low' | 'high' | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -96,6 +126,7 @@ export const db = new Dexie('fuel') as Dexie & {
   settings: EntityTable<Setting, 'key'>
   activities: EntityTable<Activity, 'id'>
   goalSettings: EntityTable<GoalSettings, 'id'>
+  dayTypes: EntityTable<DayType, 'date'>
 }
 
 db.version(1).stores({
@@ -112,4 +143,8 @@ db.version(2).stores({
   // validFrom — не уникален: возможны две версии за один день (несколько
   // правок), выбор нужной — src/lib/goals.ts, не индекс
   goalSettings: 'id, validFrom, dirty, deletedAt',
+})
+
+db.version(3).stores({
+  dayTypes: 'date, dirty, deletedAt',
 })

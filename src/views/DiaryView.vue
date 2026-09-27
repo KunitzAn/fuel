@@ -3,14 +3,16 @@ import { Calendar, Search, Settings } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import DayPickerSheet from '../components/DayPickerSheet.vue'
+import DayTypePickerSheet from '../components/DayTypePickerSheet.vue'
 import EnergyCard from '../components/EnergyCard.vue'
 import MealCard from '../components/MealCard.vue'
 import SnackCard from '../components/SnackCard.vue'
 import WeekStrip from '../components/WeekStrip.vue'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate, weekDates } from '../lib/date'
+import { setActualDayType, setPlannedDayType, type DayTypePlan } from '../lib/dayTypes'
 import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } from '../lib/diary'
 import { db } from '../lib/db'
-import { computeDayGoal, pickGoalSettingsForDate, sumActivityKcal } from '../lib/goals'
+import { applyDayTypeDelta, computeDayGoal, pickGoalSettingsForDate, sumActivityKcal, type DayTypeKind } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
@@ -29,15 +31,48 @@ const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === n
 const allSnacks = useLiveQuery(() => db.snacks.filter((s) => s.deletedAt === null).toArray(), [])
 const allActivities = useLiveQuery(() => db.activities.filter((a) => a.deletedAt === null).toArray(), [])
 const allGoalSettings = useLiveQuery(() => db.goalSettings.filter((g) => g.deletedAt === null).toArray(), [])
+const allDayTypes = useLiveQuery(() => db.dayTypes.filter((d) => d.deletedAt === null).toArray(), [])
 
 // Версия настроек этого конкретного дня — не «сегодня» (README «История
 // настроек целей»): прошлый день должен считаться по цифрам, которые были
 // действующими тогда, даже если настройки потом поменяли.
 const dayActivities = computed(() => allActivities.value.filter((a) => a.date === date.value))
+const currentGoalSettings = computed(() => pickGoalSettingsForDate(allGoalSettings.value, date.value))
+const activityGoal = computed(() =>
+  currentGoalSettings.value ? computeDayGoal(currentGoalSettings.value, sumActivityKcal(dayActivities.value)) : null,
+)
+
+// Тип дня (этап 4.4, не из README): план — снимок поправки на момент
+// простановки, не пересчитывается сам (см. db/schema.ts). Складывается с
+// activityGoal независимо от активности.
+const dayType = computed(() => allDayTypes.value.find((d) => d.date === date.value) ?? null)
 const dayGoal = computed(() => {
-  const settings = pickGoalSettingsForDate(allGoalSettings.value, date.value)
-  return settings ? computeDayGoal(settings, sumActivityKcal(dayActivities.value)) : null
+  if (!activityGoal.value) return null
+  const dt = dayType.value
+  if (!dt?.planned) return activityGoal.value
+  return applyDayTypeDelta(activityGoal.value, {
+    protein: dt.plannedDeltaProtein ?? 0,
+    fat: dt.plannedDeltaFat ?? 0,
+    carbs: dt.plannedDeltaCarbs ?? 0,
+  })
 })
+
+const pickingDayTypeKind = ref<DayTypeKind | null>(null)
+function pickPlan(kind: DayTypeKind | null) {
+  if (kind === null) {
+    void setPlannedDayType(date.value, null)
+    return
+  }
+  if (!currentGoalSettings.value) return // без базовых целей поправку не из чего считать
+  pickingDayTypeKind.value = kind
+}
+function onDayTypePicked(plan: DayTypePlan) {
+  pickingDayTypeKind.value = null
+  void setPlannedDayType(date.value, plan)
+}
+function pickFact(kind: DayTypeKind | null) {
+  void setActualDayType(date.value, kind)
+}
 
 const dayEntries = computed(() => allEntries.value.filter((e) => e.date === date.value).sort(byCreatedAt))
 const dayTotals = computed(() =>
@@ -119,6 +154,52 @@ onBeforeRouteLeave((to) => {
 
     <WeekStrip :date="date" :dates-with-entries="datesWithEntries" @select="selectDate" />
 
+    <!-- Тип дня (этап 4.4, не из README) — план с утра, факт в конце.
+         Независимые отметки: план влияет на ориентир ниже, факт — только
+         метка (в общую статистику пойдёт, когда она появится в этапе 6). -->
+    <div class="flex flex-col gap-1.5">
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-muted w-9 shrink-0">План</span>
+        <div class="flex gap-1 text-xs flex-1">
+          <button type="button" @click="pickPlan(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.planned ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+            Обычный
+          </button>
+          <button
+            type="button"
+            :disabled="!currentGoalSettings"
+            @click="pickPlan('high')"
+            class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
+            :class="dayType?.planned === 'high' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'"
+          >
+            Высокоугл.
+          </button>
+          <button
+            type="button"
+            :disabled="!currentGoalSettings"
+            @click="pickPlan('low')"
+            class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
+            :class="dayType?.planned === 'low' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'"
+          >
+            Низкоугл.
+          </button>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-muted w-9 shrink-0">Факт</span>
+        <div class="flex gap-1 text-xs flex-1">
+          <button type="button" @click="pickFact(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.actual ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+            Обычный
+          </button>
+          <button type="button" @click="pickFact('high')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'high' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+            Высокоугл.
+          </button>
+          <button type="button" @click="pickFact('low')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'low' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+            Низкоугл.
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="rounded-2xl bg-card border border-line px-4 py-3 grid grid-cols-4 text-center">
       <div>
         <p class="text-[11px] text-muted">Б</p>
@@ -161,5 +242,15 @@ onBeforeRouteLeave((to) => {
     </div>
 
     <DayPickerSheet v-if="pickingDay" @close="pickingDay = false" @pick="pickDay" />
+    <DayTypePickerSheet
+      v-if="pickingDayTypeKind && currentGoalSettings"
+      :date="date"
+      :kind="pickingDayTypeKind"
+      :settings="currentGoalSettings"
+      :entries="allEntries"
+      :day-type-rows="allDayTypes"
+      @close="pickingDayTypeKind = null"
+      @pick="onDayTypePicked"
+    />
   </main>
 </template>

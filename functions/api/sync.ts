@@ -1,5 +1,5 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
-import { activities, entries, foods, goalSettings, snacks } from '../../db/schema'
+import { activities, dayTypes, entries, foods, goalSettings, snacks } from '../../db/schema'
 import type { AuthedData } from '../_lib/context'
 import { getDb, type Db } from '../_lib/db'
 import type { Env } from '../_lib/env'
@@ -58,6 +58,25 @@ interface WireGoalSettings {
   perHundredProtein: number
   perHundredFat: number
   perHundredCarbs: number
+  highDeltaProtein: number
+  highDeltaFat: number
+  highDeltaCarbs: number
+  lowDeltaProtein: number
+  lowDeltaFat: number
+  lowDeltaCarbs: number
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+interface WireDayType {
+  date: string
+  planned: 'low' | 'high' | null
+  plannedSource: 'manual' | 'stats' | null
+  plannedDeltaProtein: number | null
+  plannedDeltaFat: number | null
+  plannedDeltaCarbs: number | null
+  actual: 'low' | 'high' | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -96,7 +115,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
   const since = new URL(ctx.request.url).searchParams.get('since')
   const sinceDate = since ? new Date(since) : null
 
-  const [foodRows, snackRows, entryRows, activityRows, goalSettingsRows] = await Promise.all([
+  const [foodRows, snackRows, entryRows, activityRows, goalSettingsRows, dayTypeRows] = await Promise.all([
     db
       .select()
       .from(foods)
@@ -130,6 +149,14 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
         sinceDate
           ? and(eq(goalSettings.userId, userId), gt(goalSettings.serverUpdatedAt, sinceDate))
           : eq(goalSettings.userId, userId),
+      ),
+    db
+      .select()
+      .from(dayTypes)
+      .where(
+        sinceDate
+          ? and(eq(dayTypes.userId, userId), gt(dayTypes.serverUpdatedAt, sinceDate))
+          : eq(dayTypes.userId, userId),
       ),
   ])
 
@@ -203,9 +230,27 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       perHundredProtein: g.perHundredProtein,
       perHundredFat: g.perHundredFat,
       perHundredCarbs: g.perHundredCarbs,
+      highDeltaProtein: g.highDeltaProtein,
+      highDeltaFat: g.highDeltaFat,
+      highDeltaCarbs: g.highDeltaCarbs,
+      lowDeltaProtein: g.lowDeltaProtein,
+      lowDeltaFat: g.lowDeltaFat,
+      lowDeltaCarbs: g.lowDeltaCarbs,
       createdAt: g.createdAt.toISOString(),
       updatedAt: g.updatedAt.toISOString(),
       deletedAt: g.deletedAt?.toISOString() ?? null,
+    })),
+    dayTypes: dayTypeRows.map((d) => ({
+      date: d.date,
+      planned: d.planned,
+      plannedSource: d.plannedSource,
+      plannedDeltaProtein: d.plannedDeltaProtein,
+      plannedDeltaFat: d.plannedDeltaFat,
+      plannedDeltaCarbs: d.plannedDeltaCarbs,
+      actual: d.actual,
+      createdAt: d.createdAt.toISOString(),
+      updatedAt: d.updatedAt.toISOString(),
+      deletedAt: d.deletedAt?.toISOString() ?? null,
     })),
   })
 }
@@ -229,6 +274,7 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
     entries?: WireEntry[]
     activities?: WireActivity[]
     goalSettings?: WireGoalSettings[]
+    dayTypes?: WireDayType[]
   }>(ctx.request)
   if (!body) return error(400, 'invalid_body')
 
@@ -237,6 +283,7 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
   const acceptedEntries = await upsertEntries(db, userId, body.entries ?? [])
   const acceptedActivities = await upsertActivities(db, userId, body.activities ?? [])
   const acceptedGoalSettings = await upsertGoalSettings(db, userId, body.goalSettings ?? [])
+  const acceptedDayTypes = await upsertDayTypes(db, userId, body.dayTypes ?? [])
 
   return json({
     serverTime: new Date().toISOString(),
@@ -246,6 +293,7 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
       entries: acceptedEntries,
       activities: acceptedActivities,
       goalSettings: acceptedGoalSettings,
+      dayTypes: acceptedDayTypes,
     },
   })
 }
@@ -450,6 +498,12 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         perHundredProtein: g.perHundredProtein,
         perHundredFat: g.perHundredFat,
         perHundredCarbs: g.perHundredCarbs,
+        highDeltaProtein: g.highDeltaProtein,
+        highDeltaFat: g.highDeltaFat,
+        highDeltaCarbs: g.highDeltaCarbs,
+        lowDeltaProtein: g.lowDeltaProtein,
+        lowDeltaFat: g.lowDeltaFat,
+        lowDeltaCarbs: g.lowDeltaCarbs,
         createdAt: new Date(g.createdAt),
         updatedAt: new Date(g.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -467,6 +521,12 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         perHundredProtein: sql`excluded.per_hundred_protein`,
         perHundredFat: sql`excluded.per_hundred_fat`,
         perHundredCarbs: sql`excluded.per_hundred_carbs`,
+        highDeltaProtein: sql`excluded.high_delta_protein`,
+        highDeltaFat: sql`excluded.high_delta_fat`,
+        highDeltaCarbs: sql`excluded.high_delta_carbs`,
+        lowDeltaProtein: sql`excluded.low_delta_protein`,
+        lowDeltaFat: sql`excluded.low_delta_fat`,
+        lowDeltaCarbs: sql`excluded.low_delta_carbs`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
@@ -475,4 +535,49 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
     })
     .returning({ id: goalSettings.id })
   return accepted.map((r) => r.id)
+}
+
+/**
+ * В отличие от прочих upsert-функций — конфликт по (`userId`, `date`), а не
+ * по синтетическому `id`: у day_types его нет, сама дата и есть первичный
+ * ключ (db/schema.ts), поэтому два устройства без координации всегда метят
+ * один и тот же ключ строки для одного и того же дня.
+ */
+async function upsertDayTypes(db: Db, userId: number, rows: WireDayType[]): Promise<string[]> {
+  if (rows.length === 0) return []
+  const accepted = await db
+    .insert(dayTypes)
+    .values(
+      rows.map((d) => ({
+        userId,
+        date: d.date,
+        planned: d.planned,
+        plannedSource: d.plannedSource,
+        plannedDeltaProtein: d.plannedDeltaProtein,
+        plannedDeltaFat: d.plannedDeltaFat,
+        plannedDeltaCarbs: d.plannedDeltaCarbs,
+        actual: d.actual,
+        createdAt: new Date(d.createdAt),
+        updatedAt: new Date(d.updatedAt),
+        serverUpdatedAt: sql`now()`,
+        deletedAt: d.deletedAt ? new Date(d.deletedAt) : null,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [dayTypes.userId, dayTypes.date],
+      set: {
+        planned: sql`excluded.planned`,
+        plannedSource: sql`excluded.planned_source`,
+        plannedDeltaProtein: sql`excluded.planned_delta_protein`,
+        plannedDeltaFat: sql`excluded.planned_delta_fat`,
+        plannedDeltaCarbs: sql`excluded.planned_delta_carbs`,
+        actual: sql`excluded.actual`,
+        updatedAt: sql`excluded.updated_at`,
+        serverUpdatedAt: sql`now()`,
+        deletedAt: sql`excluded.deleted_at`,
+      },
+      setWhere: sql`${dayTypes.userId} = ${userId} and excluded.updated_at > ${dayTypes.updatedAt}`,
+    })
+    .returning({ date: dayTypes.date })
+  return accepted.map((r) => r.date)
 }

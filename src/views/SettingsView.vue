@@ -46,6 +46,13 @@ const restingKcalInput = ref('')
 const perHundredProteinInput = ref('')
 const perHundredFatInput = ref('')
 const perHundredCarbsInput = ref('')
+// Поправка для типа дня (этап 4.4) — та же версия, что и база
+const highDeltaProteinInput = ref('')
+const highDeltaFatInput = ref('')
+const highDeltaCarbsInput = ref('')
+const lowDeltaProteinInput = ref('')
+const lowDeltaFatInput = ref('')
+const lowDeltaCarbsInput = ref('')
 
 // Предзаполняем один раз, как только текущая версия действительно
 // загрузилась — дальше это черновик формы, синк его не переписывает.
@@ -60,6 +67,12 @@ watch(
     perHundredProteinInput.value = String(s.perHundredProtein)
     perHundredFatInput.value = String(s.perHundredFat)
     perHundredCarbsInput.value = String(s.perHundredCarbs)
+    highDeltaProteinInput.value = String(s.highDeltaProtein)
+    highDeltaFatInput.value = String(s.highDeltaFat)
+    highDeltaCarbsInput.value = String(s.highDeltaCarbs)
+    lowDeltaProteinInput.value = String(s.lowDeltaProtein)
+    lowDeltaFatInput.value = String(s.lowDeltaFat)
+    lowDeltaCarbsInput.value = String(s.lowDeltaCarbs)
   },
   { once: true },
 )
@@ -76,9 +89,21 @@ const perHundredKcalHint = computed(() =>
 )
 
 const canSaveGoals = computed(() =>
-  [baseProteinInput, baseFatInput, baseCarbsInput, restingKcalInput, perHundredProteinInput, perHundredFatInput, perHundredCarbsInput].every(
-    (r) => parseDecimal(r.value) !== null,
-  ),
+  [
+    baseProteinInput,
+    baseFatInput,
+    baseCarbsInput,
+    restingKcalInput,
+    perHundredProteinInput,
+    perHundredFatInput,
+    perHundredCarbsInput,
+    highDeltaProteinInput,
+    highDeltaFatInput,
+    highDeltaCarbsInput,
+    lowDeltaProteinInput,
+    lowDeltaFatInput,
+    lowDeltaCarbsInput,
+  ].every((r) => parseDecimal(r.value) !== null),
 )
 
 const goalsSavedJustNow = ref(false)
@@ -92,6 +117,12 @@ async function saveGoals() {
     perHundredProtein: parseDecimal(perHundredProteinInput.value)!,
     perHundredFat: parseDecimal(perHundredFatInput.value)!,
     perHundredCarbs: parseDecimal(perHundredCarbsInput.value)!,
+    highDeltaProtein: parseDecimal(highDeltaProteinInput.value)!,
+    highDeltaFat: parseDecimal(highDeltaFatInput.value)!,
+    highDeltaCarbs: parseDecimal(highDeltaCarbsInput.value)!,
+    lowDeltaProtein: parseDecimal(lowDeltaProteinInput.value)!,
+    lowDeltaFat: parseDecimal(lowDeltaFatInput.value)!,
+    lowDeltaCarbs: parseDecimal(lowDeltaCarbsInput.value)!,
   })
   goalsSavedJustNow.value = true
   setTimeout(() => (goalsSavedJustNow.value = false), 2000)
@@ -193,6 +224,45 @@ async function saveGoals() {
 
       <p class="text-xs text-muted">
         Прибавка от активности только положительная — цель не опускается ниже дефолтной. Изменение действует с сегодняшнего дня, прошлые дни остаются со своими цифрами.
+      </p>
+
+      <div class="flex flex-col gap-1 pt-2 border-t border-line">
+        <span class="text-xs text-muted">Высокоуглеводный день — прибавка к цели (вручную)</span>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Б, г</span>
+            <input v-model="highDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ж, г</span>
+            <input v-model="highDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">У, г</span>
+            <input v-model="highDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <span class="text-xs text-muted">Низкоуглеводный день — убавка от цели (вручную, вводить положительным числом)</span>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Б, г</span>
+            <input v-model="lowDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ж, г</span>
+            <input v-model="lowDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">У, г</span>
+            <input v-model="lowDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+        </div>
+      </div>
+      <p class="text-xs text-muted">
+        При простановке типа дня можно будет выбрать: эти числа или среднее по факту прошлых дней такого же типа.
       </p>
 
       <button
