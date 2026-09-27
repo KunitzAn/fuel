@@ -15,10 +15,23 @@ import { useLiveQuery } from '../lib/useLiveQuery'
 // iOS проверка может висеть до таймаута).
 const checking = ref(!me.value)
 
+// Сохранение целей всегда пишет ПОЛНый новый снимок (versioning, см. ниже) —
+// если форма ещё не успела подтянуть текущую версию с сервера (свежий
+// логин на новом устройстве, до первого синка), «Сохранить» могло бы
+// молча стереть уже настроенное. Ждём первую попытку синка перед тем, как
+// разрешить сохранять; без сети/входа ждать нечего — сразу готово.
+const goalsFormReady = ref(false)
+
 onMounted(async () => {
   await checkSession()
   checking.value = false
-  if (me.value) void runSync()
+  if (me.value) {
+    void runSync().finally(() => {
+      goalsFormReady.value = true
+    })
+  } else {
+    goalsFormReady.value = true
+  }
 })
 
 // Офлайн-копия готова, когда страницей управляет service worker — он
@@ -42,6 +55,7 @@ const currentGoalSettings = computed(() => pickGoalSettingsForDate(goalRows.valu
 const baseProteinInput = ref('')
 const baseFatInput = ref('')
 const baseCarbsInput = ref('')
+const baseKcalInput = ref('') // не хранится отдельно — только сверка с БЖУ при сохранении
 const restingKcalInput = ref('')
 const perHundredProteinInput = ref('')
 const perHundredFatInput = ref('')
@@ -65,6 +79,9 @@ watch(
     baseProteinInput.value = toInput(s.baseProtein)
     baseFatInput.value = toInput(s.baseFat)
     baseCarbsInput.value = toInput(s.baseCarbs)
+    if (s.baseProtein !== null && s.baseFat !== null && s.baseCarbs !== null) {
+      baseKcalInput.value = String(Math.round(kcalFromMacros(s.baseProtein, s.baseFat, s.baseCarbs)))
+    }
     restingKcalInput.value = toInput(s.restingKcal)
     perHundredProteinInput.value = toInput(s.perHundredProtein)
     perHundredFatInput.value = toInput(s.perHundredFat)
@@ -79,14 +96,23 @@ watch(
   { once: true },
 )
 
-// null, если хоть одно из трёх пусто/не число — «= … ккал» тогда не про
-// что показывать (не 0 — 0 выглядел бы как настоящая цель в 0 г).
-const baseKcal = computed(() => {
+// null, если хоть одно из трёх пусто/не число — посчитать не из чего.
+const baseKcalFromMacros = computed(() => {
   const p = parseDecimal(baseProteinInput.value)
   const f = parseDecimal(baseFatInput.value)
   const c = parseDecimal(baseCarbsInput.value)
   return p !== null && f !== null && c !== null ? kcalFromMacros(p, f, c) : null
 })
+// Автоподстановка — только пока поле пустое (владелица: «должны
+// автоматом подставляться, но можно их изменить»): правка руками не
+// перетирается следующим же вводом в Б/Ж/У, только явной кнопкой ниже.
+watch(baseKcalFromMacros, (kcal) => {
+  if (kcal !== null && baseKcalInput.value.trim() === '') baseKcalInput.value = String(Math.round(kcal))
+})
+function fillBaseKcalFromMacros() {
+  if (baseKcalFromMacros.value !== null) baseKcalInput.value = String(Math.round(baseKcalFromMacros.value))
+}
+
 const perHundredKcalHint = computed(() =>
   kcalFromMacros(
     parseDecimal(perHundredProteinInput.value) ?? 0,
@@ -95,26 +121,67 @@ const perHundredKcalHint = computed(() =>
   ),
 )
 
-// Все поля необязательные (владелица: «это все необязательные настройки») —
-// пустое поле сохраняется как null, не блокирует сохранение остальных.
-// Пусто целиком по группе (база, high, low) — эта часть просто не
-// используется дальше (src/lib/goals.ts: hasBaseGoal, isDayTypeDeltaConfigured).
+/**
+ * Группа из нескольких полей (база Б/Ж/У/покой; high или low Б/Ж/У) —
+ * тронула хоть одно, остальные пустые в группе достраиваются нулями, а не
+ * гасят всю группу целиком (владелица: «если указать только 2 из 3 — в 3
+ * автоматом 0»). Совсем пустая группа (ничего не тронуто) — так и
+ * остаётся пустой: это и есть «не настроено» (`hasBaseGoal`,
+ * `isDayTypeDeltaConfigured` в lib/goals.ts).
+ */
+function resolveGroup(inputs: string[]): (number | null)[] {
+  const parsed = inputs.map(parseDecimal)
+  if (parsed.every((v) => v === null)) return parsed
+  return parsed.map((v) => v ?? 0)
+}
+
+const kcalError = ref<string | null>(null)
 const goalsSavedJustNow = ref(false)
 async function saveGoals() {
+  if (!goalsFormReady.value) return
+  kcalError.value = null
+  const [baseProtein, baseFat, baseCarbs, restingKcal] = resolveGroup([
+    baseProteinInput.value,
+    baseFatInput.value,
+    baseCarbsInput.value,
+    restingKcalInput.value,
+  ])
+  const [highDeltaProtein, highDeltaFat, highDeltaCarbs] = resolveGroup([
+    highDeltaProteinInput.value,
+    highDeltaFatInput.value,
+    highDeltaCarbsInput.value,
+  ])
+  const [lowDeltaProtein, lowDeltaFat, lowDeltaCarbs] = resolveGroup([
+    lowDeltaProteinInput.value,
+    lowDeltaFatInput.value,
+    lowDeltaCarbsInput.value,
+  ])
+
+  // Ккал нигде не хранится — везде считается из БЖУ (README «Калории из
+  // БЖУ»); поле здесь только для проверки, что сама не ошиблась в цифрах.
+  if (baseProtein !== null) {
+    const expected = kcalFromMacros(baseProtein, baseFat!, baseCarbs!)
+    const entered = parseDecimal(baseKcalInput.value)
+    if (entered !== null && Math.round(entered) !== Math.round(expected)) {
+      kcalError.value = `Не сходится с БЖУ — по ним выходит ${Math.round(expected)} ккал`
+      return
+    }
+  }
+
   await saveGoalSettings({
-    baseProtein: parseDecimal(baseProteinInput.value),
-    baseFat: parseDecimal(baseFatInput.value),
-    baseCarbs: parseDecimal(baseCarbsInput.value),
-    restingKcal: parseDecimal(restingKcalInput.value),
-    perHundredProtein: parseDecimal(perHundredProteinInput.value),
-    perHundredFat: parseDecimal(perHundredFatInput.value),
-    perHundredCarbs: parseDecimal(perHundredCarbsInput.value),
-    highDeltaProtein: parseDecimal(highDeltaProteinInput.value),
-    highDeltaFat: parseDecimal(highDeltaFatInput.value),
-    highDeltaCarbs: parseDecimal(highDeltaCarbsInput.value),
-    lowDeltaProtein: parseDecimal(lowDeltaProteinInput.value),
-    lowDeltaFat: parseDecimal(lowDeltaFatInput.value),
-    lowDeltaCarbs: parseDecimal(lowDeltaCarbsInput.value),
+    baseProtein,
+    baseFat,
+    baseCarbs,
+    restingKcal,
+    perHundredProtein: parseDecimal(perHundredProteinInput.value) ?? 0,
+    perHundredFat: parseDecimal(perHundredFatInput.value) ?? 0,
+    perHundredCarbs: parseDecimal(perHundredCarbsInput.value) ?? 0,
+    highDeltaProtein,
+    highDeltaFat,
+    highDeltaCarbs,
+    lowDeltaProtein,
+    lowDeltaFat,
+    lowDeltaCarbs,
   })
   goalsSavedJustNow.value = true
   setTimeout(() => (goalsSavedJustNow.value = false), 2000)
@@ -187,7 +254,25 @@ async function saveGoals() {
             <input v-model="baseCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
           </label>
         </div>
-        <p class="text-xs text-muted">{{ baseKcal !== null ? `= ${Math.round(baseKcal)} ккал, считается из БЖУ` : 'Необязательно — не заполнено, цель дня не будет показываться' }}</p>
+        <div class="flex items-end gap-2">
+          <label class="flex-1 flex flex-col gap-1">
+            <span class="text-xs text-muted">Ккал</span>
+            <input
+              v-model="baseKcalInput"
+              type="text"
+              inputmode="decimal"
+              placeholder="Подставится из БЖУ"
+              class="rounded-2xl bg-bg border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+            />
+          </label>
+          <button type="button" @click="fillBaseKcalFromMacros" class="rounded-2xl border border-line px-3 py-2.5 text-xs text-ink shrink-0">
+            = из БЖУ
+          </button>
+        </div>
+        <p v-if="kcalError" class="text-xs text-red-500">{{ kcalError }}</p>
+        <p v-else class="text-xs text-muted">
+          {{ baseKcalFromMacros !== null ? 'Подставляется само, пока не начала печатать своё' : 'Необязательно — совсем не заполнено, цели дня не будет' }}
+        </p>
       </div>
 
       <label class="flex flex-col gap-1">
@@ -255,12 +340,18 @@ async function saveGoals() {
       </div>
       <p class="text-xs text-muted">
         При простановке типа дня можно будет выбрать: эти числа или среднее по факту прошлых дней такого же типа.
-        Всё здесь необязательно — пустое поле просто выключает соответствующую часть (высоко- или низкоуглеводные дни
-        по отдельности, саму цель целиком), не мешая остальному. Прошлые дни, где что-то уже было настроено, в
-        статистике не меняются.
+        Всё здесь необязательно. Тронули хоть одно поле в группе (базовая цель, high, low — по отдельности) — остальные
+        пустые в ней сохранятся нулями; не тронули ни одного — вся группа так и останется не настроенной, не мешая
+        другим. Прошлые дни, где что-то уже было настроено, в статистике не меняются.
       </p>
 
-      <button type="button" @click="saveGoals" class="rounded-2xl py-3 text-sm font-medium text-white bg-accent">
+      <p v-if="!goalsFormReady" class="text-xs text-muted">Подтягиваю то, что уже настроено…</p>
+      <button
+        type="button"
+        :disabled="!goalsFormReady"
+        @click="saveGoals"
+        class="rounded-2xl py-3 text-sm font-medium text-white bg-accent disabled:opacity-40"
+      >
         {{ goalsSavedJustNow ? 'Сохранено' : 'Сохранить' }}
       </button>
     </section>

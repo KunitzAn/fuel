@@ -305,6 +305,15 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
  * запроса на строку упираются в него уже на паре завтраков). `excluded.<col>`
  * — предложенная (INSERT-нутая) версия строки внутри ON CONFLICT DO UPDATE.
  * `server_updated_at` — всегда `now()`, не значение от клиента (см. GET).
+ *
+ * `setWhere: excluded.updated_at >= <col>`, не строго `>` — иначе повторная
+ * отправка уже принятой (но с тем же updatedAt) строки после потерянного
+ * ответа сети навсегда застревала бы в чужой копии как dirty: WHERE не
+ * срабатывал (не строго больше), UPDATE молча не выполнялся, `.returning()`
+ * её не возвращал, id не попадал в accepted — клиент так и не узнавал, что
+ * сервер её на самом деле уже принял, и «Ждут отправки» не обнулялось.
+ * Совпадающий updatedAt от ДРУГОГО устройства (не ретрай) — статистически
+ * невозможен, так что `>=` ничего не портит.
  */
 async function upsertFoods(db: Db, userId: number, rows: WireFood[]): Promise<string[]> {
   if (rows.length === 0) return []
@@ -349,7 +358,7 @@ async function upsertFoods(db: Db, userId: number, rows: WireFood[]): Promise<st
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
       },
-      setWhere: sql`${foods.userId} = ${userId} and excluded.updated_at > ${foods.updatedAt}`,
+      setWhere: sql`${foods.userId} = ${userId} and excluded.updated_at >= ${foods.updatedAt}`,
     })
     .returning({ id: foods.id })
   return accepted.map((r) => r.id)
@@ -384,7 +393,7 @@ async function upsertSnacks(db: Db, userId: number, rows: WireSnack[]): Promise<
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
       },
-      setWhere: sql`${snacks.userId} = ${userId} and excluded.updated_at > ${snacks.updatedAt}`,
+      setWhere: sql`${snacks.userId} = ${userId} and excluded.updated_at >= ${snacks.updatedAt}`,
     })
     .returning({ id: snacks.id })
   return accepted.map((r) => r.id)
@@ -435,7 +444,7 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
       },
-      setWhere: sql`${entries.userId} = ${userId} and excluded.updated_at > ${entries.updatedAt}`,
+      setWhere: sql`${entries.userId} = ${userId} and excluded.updated_at >= ${entries.updatedAt}`,
     })
     .returning({ id: entries.id })
   return accepted.map((r) => r.id)
@@ -476,7 +485,7 @@ async function upsertActivities(db: Db, userId: number, rows: WireActivity[]): P
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
       },
-      setWhere: sql`${activities.userId} = ${userId} and excluded.updated_at > ${activities.updatedAt}`,
+      setWhere: sql`${activities.userId} = ${userId} and excluded.updated_at >= ${activities.updatedAt}`,
     })
     .returning({ id: activities.id })
   return accepted.map((r) => r.id)
@@ -531,7 +540,7 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
       },
-      setWhere: sql`${goalSettings.userId} = ${userId} and excluded.updated_at > ${goalSettings.updatedAt}`,
+      setWhere: sql`${goalSettings.userId} = ${userId} and excluded.updated_at >= ${goalSettings.updatedAt}`,
     })
     .returning({ id: goalSettings.id })
   return accepted.map((r) => r.id)
@@ -576,7 +585,7 @@ async function upsertDayTypes(db: Db, userId: number, rows: WireDayType[]): Prom
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
       },
-      setWhere: sql`${dayTypes.userId} = ${userId} and excluded.updated_at > ${dayTypes.updatedAt}`,
+      setWhere: sql`${dayTypes.userId} = ${userId} and excluded.updated_at >= ${dayTypes.updatedAt}`,
     })
     .returning({ date: dayTypes.date })
   return accepted.map((r) => r.date)
