@@ -3,12 +3,14 @@ import { Calendar, Search, Settings } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import DayPickerSheet from '../components/DayPickerSheet.vue'
+import EnergyCard from '../components/EnergyCard.vue'
 import MealCard from '../components/MealCard.vue'
 import SnackCard from '../components/SnackCard.vue'
 import WeekStrip from '../components/WeekStrip.vue'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate, weekDates } from '../lib/date'
 import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } from '../lib/diary'
 import { db } from '../lib/db'
+import { computeDayGoal, pickGoalSettingsForDate, sumActivityKcal } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
@@ -25,6 +27,17 @@ const today = todayLocalDate()
 // пересоздавать Dexie-подписку на каждый свайп/тап по неделе.
 const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === null).toArray(), [])
 const allSnacks = useLiveQuery(() => db.snacks.filter((s) => s.deletedAt === null).toArray(), [])
+const allActivities = useLiveQuery(() => db.activities.filter((a) => a.deletedAt === null).toArray(), [])
+const allGoalSettings = useLiveQuery(() => db.goalSettings.filter((g) => g.deletedAt === null).toArray(), [])
+
+// Версия настроек этого конкретного дня — не «сегодня» (README «История
+// настроек целей»): прошлый день должен считаться по цифрам, которые были
+// действующими тогда, даже если настройки потом поменяли.
+const dayActivities = computed(() => allActivities.value.filter((a) => a.date === date.value))
+const dayGoal = computed(() => {
+  const settings = pickGoalSettingsForDate(allGoalSettings.value, date.value)
+  return settings ? computeDayGoal(settings, sumActivityKcal(dayActivities.value)) : null
+})
 
 const dayEntries = computed(() => allEntries.value.filter((e) => e.date === date.value).sort(byCreatedAt))
 const dayTotals = computed(() =>
@@ -109,22 +122,29 @@ onBeforeRouteLeave((to) => {
     <div class="rounded-2xl bg-card border border-line px-4 py-3 grid grid-cols-4 text-center">
       <div>
         <p class="text-[11px] text-muted">Б</p>
-        <p class="text-sm font-semibold text-ink">{{ dayTotals.protein.toFixed(1) }}</p>
+        <p class="text-sm font-semibold text-ink">
+          {{ dayTotals.protein.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.protein) }}<span v-if="dayGoal.proteinChanged">⚡</span></template>
+        </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">Ж</p>
-        <p class="text-sm font-semibold text-ink">{{ dayTotals.fat.toFixed(1) }}</p>
+        <p class="text-sm font-semibold text-ink">
+          {{ dayTotals.fat.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.fat) }}<span v-if="dayGoal.fatChanged">⚡</span></template>
+        </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">У</p>
-        <p class="text-sm font-semibold text-ink">{{ dayTotals.carbs.toFixed(1) }}</p>
+        <p class="text-sm font-semibold text-ink">
+          {{ dayTotals.carbs.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.carbs) }}<span v-if="dayGoal.carbsChanged">⚡</span></template>
+        </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">Ккал</p>
-        <p class="text-sm font-semibold text-ink">{{ Math.round(dayTotals.kcal) }}</p>
+        <p class="text-sm font-semibold text-ink">
+          {{ Math.round(dayTotals.kcal) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.kcal) }}</template>
+        </p>
       </div>
     </div>
-    <!-- Цель («123/120», ⚡) появится в этапе 4 — пока показываем только факт -->
 
     <div class="flex flex-col gap-3">
       <template v-for="meal in MEALS" :key="meal">
@@ -137,8 +157,8 @@ onBeforeRouteLeave((to) => {
           :day-kcal="dayTotals.kcal"
         />
       </template>
+      <EnergyCard :date="date" :activities="dayActivities" :goal="dayGoal" :eaten-kcal="dayTotals.kcal" />
     </div>
-    <!-- Карточка энергии — этап 4 -->
 
     <DayPickerSheet v-if="pickingDay" @close="pickingDay = false" @pick="pickDay" />
   </main>

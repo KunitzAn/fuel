@@ -31,11 +31,25 @@ describe('computeDayGoal', () => {
     expect(goal.changedByActivity).toBe(true)
   })
 
+  it('⚡ только у макроса, который реально выше базы — не у всех подряд', () => {
+    const goal = computeDayGoal(settings, 500)
+    expect(goal.carbsChanged).toBe(true)
+    expect(goal.proteinChanged).toBe(false)
+    expect(goal.fatChanged).toBe(false)
+  })
+
+  it('активность есть, но все «на 100 ккал» — 0 — цель не двигается, ⚡ нет', () => {
+    const goal = computeDayGoal({ ...settings, perHundredCarbs: 0 }, 500)
+    expect(goal.carbs).toBe(150)
+    expect(goal.changedByActivity).toBe(false)
+  })
+
   it('прибавка только положительная — отрицательная активность не опускает цель ниже базы', () => {
     const goal = computeDayGoal(settings, -200)
     expect(goal.protein).toBe(120)
     expect(goal.carbs).toBe(150)
     expect(goal.spentKcal).toBe(1450)
+    expect(goal.changedByActivity).toBe(false)
   })
 
   it('ккал цели считается из БЖУ цели, не из базовых ккал + доля активности', () => {

@@ -23,7 +23,11 @@ export interface DayGoal {
   kcal: number
   activityKcal: number
   spentKcal: number // энергия покоя + активность
-  /** ⚡ — цель дня выросла от активности (README «Шапка дневника»). */
+  /** Который из макросов реально выросли от активности — ⚡ у той ячейки в шапке (README). */
+  proteinChanged: boolean
+  fatChanged: boolean
+  carbsChanged: boolean
+  /** ⚡ у ккал/общий флаг — вырос хоть один макрос. */
   changedByActivity: boolean
 }
 
@@ -32,12 +36,19 @@ export interface DayGoal {
  * «Без синхронизации и ручных записей»). Прибавка только положительная —
  * минимумов по макросам нет, activityKcal ниже 0 не бывает (сумма ккал
  * тренировок/активностей), но на всякий случай не даём цели уйти ниже базы.
+ *
+ * `changedByActivity` — не «была ли активность», а «хоть один макрос
+ * реально вырос»: при перекосе настроек «на 100 ккал» в 0/0/0 по всем
+ * макросам активность есть, а цель не двигается — ⚡ показывать нечего.
  */
 export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGoal {
   const clampedActivity = Math.max(0, activityKcal)
   const protein = settings.baseProtein + (clampedActivity / 100) * settings.perHundredProtein
   const fat = settings.baseFat + (clampedActivity / 100) * settings.perHundredFat
   const carbs = settings.baseCarbs + (clampedActivity / 100) * settings.perHundredCarbs
+  const proteinChanged = protein > settings.baseProtein
+  const fatChanged = fat > settings.baseFat
+  const carbsChanged = carbs > settings.baseCarbs
   return {
     protein,
     fat,
@@ -45,7 +56,10 @@ export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGo
     kcal: kcalFromMacros(protein, fat, carbs),
     activityKcal: clampedActivity,
     spentKcal: settings.restingKcal + clampedActivity,
-    changedByActivity: clampedActivity > 0,
+    proteinChanged,
+    fatChanged,
+    carbsChanged,
+    changedByActivity: proteinChanged || fatChanged || carbsChanged,
   }
 }
 
