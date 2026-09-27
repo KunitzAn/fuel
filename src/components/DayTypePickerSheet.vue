@@ -44,9 +44,16 @@ function pick(source: 'manual' | 'stats') {
     <div class="relative w-full max-w-md rounded-t-3xl bg-bg px-4 pt-5 pb-8 flex flex-col gap-4">
       <h2 class="text-base font-semibold text-ink">Откуда взять поправку — {{ KIND_LABEL[kind] }} день?</h2>
 
-      <button type="button" @click="pick('manual')" class="rounded-2xl border border-line px-4 py-3 text-left">
+      <button
+        type="button"
+        :disabled="!manualDelta"
+        @click="pick('manual')"
+        class="rounded-2xl border border-line px-4 py-3 text-left disabled:opacity-40"
+      >
         <p class="text-sm text-ink">Вручную (из настроек)</p>
-        <p class="text-xs text-muted mt-0.5">{{ formatDelta(manualDelta) }}</p>
+        <p class="text-xs text-muted mt-0.5">
+          {{ manualDelta ? formatDelta(manualDelta) : `Не заполнено в настройках для «${KIND_LABEL[kind]}»` }}
+        </p>
       </button>
 
       <div class="rounded-2xl border border-line px-4 py-3">

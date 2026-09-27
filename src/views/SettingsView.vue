@@ -56,30 +56,37 @@ const lowDeltaCarbsInput = ref('')
 
 // Предзаполняем один раз, как только текущая версия действительно
 // загрузилась — дальше это черновик формы, синк его не переписывает.
+// null — поле не было заполнено, оставляем инпут пустым, а не «null» строкой.
+const toInput = (v: number | null) => (v !== null ? String(v) : '')
 watch(
   currentGoalSettings,
   (s) => {
     if (!s) return
-    baseProteinInput.value = String(s.baseProtein)
-    baseFatInput.value = String(s.baseFat)
-    baseCarbsInput.value = String(s.baseCarbs)
-    restingKcalInput.value = String(s.restingKcal)
-    perHundredProteinInput.value = String(s.perHundredProtein)
-    perHundredFatInput.value = String(s.perHundredFat)
-    perHundredCarbsInput.value = String(s.perHundredCarbs)
-    highDeltaProteinInput.value = String(s.highDeltaProtein)
-    highDeltaFatInput.value = String(s.highDeltaFat)
-    highDeltaCarbsInput.value = String(s.highDeltaCarbs)
-    lowDeltaProteinInput.value = String(s.lowDeltaProtein)
-    lowDeltaFatInput.value = String(s.lowDeltaFat)
-    lowDeltaCarbsInput.value = String(s.lowDeltaCarbs)
+    baseProteinInput.value = toInput(s.baseProtein)
+    baseFatInput.value = toInput(s.baseFat)
+    baseCarbsInput.value = toInput(s.baseCarbs)
+    restingKcalInput.value = toInput(s.restingKcal)
+    perHundredProteinInput.value = toInput(s.perHundredProtein)
+    perHundredFatInput.value = toInput(s.perHundredFat)
+    perHundredCarbsInput.value = toInput(s.perHundredCarbs)
+    highDeltaProteinInput.value = toInput(s.highDeltaProtein)
+    highDeltaFatInput.value = toInput(s.highDeltaFat)
+    highDeltaCarbsInput.value = toInput(s.highDeltaCarbs)
+    lowDeltaProteinInput.value = toInput(s.lowDeltaProtein)
+    lowDeltaFatInput.value = toInput(s.lowDeltaFat)
+    lowDeltaCarbsInput.value = toInput(s.lowDeltaCarbs)
   },
   { once: true },
 )
 
-const baseKcal = computed(() =>
-  kcalFromMacros(parseDecimal(baseProteinInput.value) ?? 0, parseDecimal(baseFatInput.value) ?? 0, parseDecimal(baseCarbsInput.value) ?? 0),
-)
+// null, если хоть одно из трёх пусто/не число — «= … ккал» тогда не про
+// что показывать (не 0 — 0 выглядел бы как настоящая цель в 0 г).
+const baseKcal = computed(() => {
+  const p = parseDecimal(baseProteinInput.value)
+  const f = parseDecimal(baseFatInput.value)
+  const c = parseDecimal(baseCarbsInput.value)
+  return p !== null && f !== null && c !== null ? kcalFromMacros(p, f, c) : null
+})
 const perHundredKcalHint = computed(() =>
   kcalFromMacros(
     parseDecimal(perHundredProteinInput.value) ?? 0,
@@ -88,41 +95,26 @@ const perHundredKcalHint = computed(() =>
   ),
 )
 
-const canSaveGoals = computed(() =>
-  [
-    baseProteinInput,
-    baseFatInput,
-    baseCarbsInput,
-    restingKcalInput,
-    perHundredProteinInput,
-    perHundredFatInput,
-    perHundredCarbsInput,
-    highDeltaProteinInput,
-    highDeltaFatInput,
-    highDeltaCarbsInput,
-    lowDeltaProteinInput,
-    lowDeltaFatInput,
-    lowDeltaCarbsInput,
-  ].every((r) => parseDecimal(r.value) !== null),
-)
-
+// Все поля необязательные (владелица: «это все необязательные настройки») —
+// пустое поле сохраняется как null, не блокирует сохранение остальных.
+// Пусто целиком по группе (база, high, low) — эта часть просто не
+// используется дальше (src/lib/goals.ts: hasBaseGoal, isDayTypeDeltaConfigured).
 const goalsSavedJustNow = ref(false)
 async function saveGoals() {
-  if (!canSaveGoals.value) return
   await saveGoalSettings({
-    baseProtein: parseDecimal(baseProteinInput.value)!,
-    baseFat: parseDecimal(baseFatInput.value)!,
-    baseCarbs: parseDecimal(baseCarbsInput.value)!,
-    restingKcal: parseDecimal(restingKcalInput.value)!,
-    perHundredProtein: parseDecimal(perHundredProteinInput.value)!,
-    perHundredFat: parseDecimal(perHundredFatInput.value)!,
-    perHundredCarbs: parseDecimal(perHundredCarbsInput.value)!,
-    highDeltaProtein: parseDecimal(highDeltaProteinInput.value)!,
-    highDeltaFat: parseDecimal(highDeltaFatInput.value)!,
-    highDeltaCarbs: parseDecimal(highDeltaCarbsInput.value)!,
-    lowDeltaProtein: parseDecimal(lowDeltaProteinInput.value)!,
-    lowDeltaFat: parseDecimal(lowDeltaFatInput.value)!,
-    lowDeltaCarbs: parseDecimal(lowDeltaCarbsInput.value)!,
+    baseProtein: parseDecimal(baseProteinInput.value),
+    baseFat: parseDecimal(baseFatInput.value),
+    baseCarbs: parseDecimal(baseCarbsInput.value),
+    restingKcal: parseDecimal(restingKcalInput.value),
+    perHundredProtein: parseDecimal(perHundredProteinInput.value),
+    perHundredFat: parseDecimal(perHundredFatInput.value),
+    perHundredCarbs: parseDecimal(perHundredCarbsInput.value),
+    highDeltaProtein: parseDecimal(highDeltaProteinInput.value),
+    highDeltaFat: parseDecimal(highDeltaFatInput.value),
+    highDeltaCarbs: parseDecimal(highDeltaCarbsInput.value),
+    lowDeltaProtein: parseDecimal(lowDeltaProteinInput.value),
+    lowDeltaFat: parseDecimal(lowDeltaFatInput.value),
+    lowDeltaCarbs: parseDecimal(lowDeltaCarbsInput.value),
   })
   goalsSavedJustNow.value = true
   setTimeout(() => (goalsSavedJustNow.value = false), 2000)
@@ -195,7 +187,7 @@ async function saveGoals() {
             <input v-model="baseCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
           </label>
         </div>
-        <p class="text-xs text-muted">= {{ Math.round(baseKcal) }} ккал, считается из БЖУ</p>
+        <p class="text-xs text-muted">{{ baseKcal !== null ? `= ${Math.round(baseKcal)} ккал, считается из БЖУ` : 'Необязательно — не заполнено, цель дня не будет показываться' }}</p>
       </div>
 
       <label class="flex flex-col gap-1">
@@ -263,14 +255,12 @@ async function saveGoals() {
       </div>
       <p class="text-xs text-muted">
         При простановке типа дня можно будет выбрать: эти числа или среднее по факту прошлых дней такого же типа.
+        Всё здесь необязательно — пустое поле просто выключает соответствующую часть (высоко- или низкоуглеводные дни
+        по отдельности, саму цель целиком), не мешая остальному. Прошлые дни, где что-то уже было настроено, в
+        статистике не меняются.
       </p>
 
-      <button
-        type="button"
-        :disabled="!canSaveGoals"
-        @click="saveGoals"
-        class="rounded-2xl py-3 text-sm font-medium text-white bg-accent disabled:opacity-40"
-      >
+      <button type="button" @click="saveGoals" class="rounded-2xl py-3 text-sm font-medium text-white bg-accent">
         {{ goalsSavedJustNow ? 'Сохранено' : 'Сохранить' }}
       </button>
     </section>

@@ -74,25 +74,28 @@ export interface Activity {
 
 /**
  * Версия настроек целей, действует с `validFrom` (README «История настроек
- * целей»). `high/lowDelta*` — поправка для типа дня (этап 4.4, не из
- * README) — та же версия, что и база.
+ * целей»). Все числовые поля необязательные: без базы (Б/Ж/У/покоя) цель на
+ * день просто не показывается — только факт. `high/lowDelta*` — поправка
+ * для типа дня (этап 4.4, не из README) — та же версия, что и база; чтобы
+ * этот тип дня был доступен на выбор, нужны все три его поля разом
+ * (src/lib/goals.ts → isDayTypeDeltaConfigured).
  */
 export interface GoalSettings {
   id: string
   validFrom: string // YYYY-MM-DD
-  baseProtein: number
-  baseFat: number
-  baseCarbs: number
-  restingKcal: number
-  perHundredProtein: number
-  perHundredFat: number
-  perHundredCarbs: number
-  highDeltaProtein: number
-  highDeltaFat: number
-  highDeltaCarbs: number
-  lowDeltaProtein: number
-  lowDeltaFat: number
-  lowDeltaCarbs: number
+  baseProtein: number | null
+  baseFat: number | null
+  baseCarbs: number | null
+  restingKcal: number | null
+  perHundredProtein: number | null
+  perHundredFat: number | null
+  perHundredCarbs: number | null
+  highDeltaProtein: number | null
+  highDeltaFat: number | null
+  highDeltaCarbs: number | null
+  lowDeltaProtein: number | null
+  lowDeltaFat: number | null
+  lowDeltaCarbs: number | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null

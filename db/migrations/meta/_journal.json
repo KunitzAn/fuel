@@ -29,6 +29,13 @@
       "when": 1790501484568,
       "tag": "0003_sticky_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790536267252,
+      "tag": "0004_chubby_lifeguard",
+      "breakpoints": true
     }
   ]
 }

@@ -3,13 +3,16 @@ import {
   applyDayTypeDelta,
   computeDayGoal,
   energyDifference,
+  hasBaseGoal,
+  isDayTypeDeltaConfigured,
   manualDayTypeDelta,
   pickGoalSettingsForDate,
   statsDayTypeDelta,
   sumActivityKcal,
+  type GoalInput,
 } from './goals'
 
-const settings = {
+const settings: GoalInput = {
   baseProtein: 120,
   baseFat: 60,
   baseCarbs: 150,
@@ -25,50 +28,95 @@ const settings = {
   lowDeltaCarbs: 60,
 }
 
+/** Все настройки в этом файле заполнены — цель точно есть, разворачиваем null для краткости тестов. */
+function goal(input: GoalInput, activityKcal: number) {
+  const g = computeDayGoal(input, activityKcal)
+  if (!g) throw new Error('expected a goal, got null')
+  return g
+}
+
 describe('computeDayGoal', () => {
   it('без активности — цель равна базе, потрачено — энергии покоя', () => {
-    const goal = computeDayGoal(settings, 0)
-    expect(goal.protein).toBe(120)
-    expect(goal.fat).toBe(60)
-    expect(goal.carbs).toBe(150)
-    expect(goal.kcal).toBe(120 * 4 + 60 * 9 + 150 * 4)
-    expect(goal.spentKcal).toBe(1450)
-    expect(goal.changedByActivity).toBe(false)
+    const g = goal(settings, 0)
+    expect(g.protein).toBe(120)
+    expect(g.fat).toBe(60)
+    expect(g.carbs).toBe(150)
+    expect(g.kcal).toBe(120 * 4 + 60 * 9 + 150 * 4)
+    expect(g.spentKcal).toBe(1450)
+    expect(g.changedByActivity).toBe(false)
   })
 
   it('пример из README: 500 ккал активности → +90 г углеводов, потрачено 1950', () => {
-    const goal = computeDayGoal(settings, 500)
-    expect(goal.carbs).toBe(150 + 90)
-    expect(goal.protein).toBe(120)
-    expect(goal.fat).toBe(60)
-    expect(goal.spentKcal).toBe(1450 + 500)
-    expect(goal.changedByActivity).toBe(true)
+    const g = goal(settings, 500)
+    expect(g.carbs).toBe(150 + 90)
+    expect(g.protein).toBe(120)
+    expect(g.fat).toBe(60)
+    expect(g.spentKcal).toBe(1450 + 500)
+    expect(g.changedByActivity).toBe(true)
   })
 
   it('⚡ только у макроса, который реально выше базы — не у всех подряд', () => {
-    const goal = computeDayGoal(settings, 500)
-    expect(goal.carbsChanged).toBe(true)
-    expect(goal.proteinChanged).toBe(false)
-    expect(goal.fatChanged).toBe(false)
+    const g = goal(settings, 500)
+    expect(g.carbsChanged).toBe(true)
+    expect(g.proteinChanged).toBe(false)
+    expect(g.fatChanged).toBe(false)
   })
 
   it('активность есть, но все «на 100 ккал» — 0 — цель не двигается, ⚡ нет', () => {
-    const goal = computeDayGoal({ ...settings, perHundredCarbs: 0 }, 500)
-    expect(goal.carbs).toBe(150)
-    expect(goal.changedByActivity).toBe(false)
+    const g = goal({ ...settings, perHundredCarbs: 0 }, 500)
+    expect(g.carbs).toBe(150)
+    expect(g.changedByActivity).toBe(false)
+  })
+
+  it('«на 100 ккал» не заполнено (null) — то же самое, что 0, не блокирует цель', () => {
+    const g = goal({ ...settings, perHundredProtein: null, perHundredFat: null, perHundredCarbs: null }, 500)
+    expect(g.protein).toBe(120)
+    expect(g.fat).toBe(60)
+    expect(g.carbs).toBe(150)
+    expect(g.changedByActivity).toBe(false)
   })
 
   it('прибавка только положительная — отрицательная активность не опускает цель ниже базы', () => {
-    const goal = computeDayGoal(settings, -200)
-    expect(goal.protein).toBe(120)
-    expect(goal.carbs).toBe(150)
-    expect(goal.spentKcal).toBe(1450)
-    expect(goal.changedByActivity).toBe(false)
+    const g = goal(settings, -200)
+    expect(g.protein).toBe(120)
+    expect(g.carbs).toBe(150)
+    expect(g.spentKcal).toBe(1450)
+    expect(g.changedByActivity).toBe(false)
   })
 
   it('ккал цели считается из БЖУ цели, не из базовых ккал + доля активности', () => {
-    const goal = computeDayGoal(settings, 500)
-    expect(goal.kcal).toBe(goal.protein * 4 + goal.fat * 9 + goal.carbs * 4)
+    const g = goal(settings, 500)
+    expect(g.kcal).toBe(g.protein * 4 + g.fat * 9 + g.carbs * 4)
+  })
+
+  it('база неполная (или пустая совсем) — цели нет, null (владелица: «без цели тоже можно жить»)', () => {
+    expect(computeDayGoal({ ...settings, baseCarbs: null }, 0)).toBeNull()
+    expect(computeDayGoal({ ...settings, restingKcal: null }, 0)).toBeNull()
+    const empty: GoalInput = {
+      baseProtein: null,
+      baseFat: null,
+      baseCarbs: null,
+      restingKcal: null,
+      perHundredProtein: null,
+      perHundredFat: null,
+      perHundredCarbs: null,
+      highDeltaProtein: null,
+      highDeltaFat: null,
+      highDeltaCarbs: null,
+      lowDeltaProtein: null,
+      lowDeltaFat: null,
+      lowDeltaCarbs: null,
+    }
+    expect(computeDayGoal(empty, 0)).toBeNull()
+  })
+})
+
+describe('hasBaseGoal', () => {
+  it('все четыре поля на месте — true', () => {
+    expect(hasBaseGoal(settings)).toBe(true)
+  })
+  it('хоть одно из четырёх пустое — false', () => {
+    expect(hasBaseGoal({ ...settings, baseFat: null })).toBe(false)
   })
 })
 
@@ -116,6 +164,21 @@ describe('pickGoalSettingsForDate', () => {
   })
 })
 
+describe('isDayTypeDeltaConfigured', () => {
+  it('все три поля заданы — true', () => {
+    expect(isDayTypeDeltaConfigured('high', settings)).toBe(true)
+    expect(isDayTypeDeltaConfigured('low', settings)).toBe(true)
+  })
+  it('хоть одно из трёх пустое — false (частично заполненная тройка не считается)', () => {
+    expect(isDayTypeDeltaConfigured('high', { ...settings, highDeltaCarbs: null })).toBe(false)
+  })
+  it('не настроен только high — low это не задевает', () => {
+    const partial = { ...settings, highDeltaProtein: null, highDeltaFat: null, highDeltaCarbs: null }
+    expect(isDayTypeDeltaConfigured('high', partial)).toBe(false)
+    expect(isDayTypeDeltaConfigured('low', partial)).toBe(true)
+  })
+})
+
 describe('manualDayTypeDelta', () => {
   it('высокоуглеводный — прибавка как задана в настройках', () => {
     expect(manualDayTypeDelta('high', settings)).toEqual({ protein: 0, fat: 0, carbs: 90 })
@@ -124,21 +187,25 @@ describe('manualDayTypeDelta', () => {
   it('низкоуглеводный — убавка (хранится как положительная величина, применяется с минусом)', () => {
     expect(manualDayTypeDelta('low', settings)).toEqual({ protein: -0, fat: -0, carbs: -60 })
   })
+
+  it('не настроено целиком (хоть одно поле пустое) — null, не 0', () => {
+    expect(manualDayTypeDelta('low', { ...settings, lowDeltaCarbs: null })).toBeNull()
+  })
 })
 
 describe('applyDayTypeDelta', () => {
   it('складывается с уже посчитанной целью, пересчитывает ккал', () => {
-    const goal = computeDayGoal(settings, 0)
-    const withDelta = applyDayTypeDelta(goal, { protein: 0, fat: 0, carbs: 90 })
+    const g = goal(settings, 0)
+    const withDelta = applyDayTypeDelta(g, { protein: 0, fat: 0, carbs: 90 })
     expect(withDelta.carbs).toBe(240)
     expect(withDelta.kcal).toBe(120 * 4 + 60 * 9 + 240 * 4)
     // spentKcal — не по этой стороне: тип дня не про расход, только про цель БЖУ
-    expect(withDelta.spentKcal).toBe(goal.spentKcal)
+    expect(withDelta.spentKcal).toBe(g.spentKcal)
   })
 
   it('delta = null — цель не меняется', () => {
-    const goal = computeDayGoal(settings, 0)
-    expect(applyDayTypeDelta(goal, null)).toEqual(goal)
+    const g = goal(settings, 0)
+    expect(applyDayTypeDelta(g, null)).toEqual(g)
   })
 })
 
@@ -187,5 +254,11 @@ describe('statsDayTypeDelta', () => {
 
   it('нет ни одного прошлого дня этого типа — null', () => {
     expect(statsDayTypeDelta('high', base, [], [], null, '2026-01-10')).toBeNull()
+  })
+
+  it('нет базы — не из чего вычитать, null', () => {
+    const dayTypeRows = [{ date: '2026-01-05', actual: 'high' as const }]
+    const entries = [entry('2026-01-05', 260)]
+    expect(statsDayTypeDelta('high', { baseProtein: null, baseFat: 60, baseCarbs: 150 }, entries, dayTypeRows, null, '2026-01-10')).toBeNull()
   })
 })

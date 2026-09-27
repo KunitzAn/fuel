@@ -8,20 +8,27 @@ import { shiftDate } from './date'
 import type { Activity, DayType, Entry, GoalSettings } from './db'
 import { kcalFromMacros, scaleByGrams, sumMacros, type Macros } from './nutrition'
 
+/**
+ * Все числовые поля необязательные (владелица: «это все необязательные
+ * настройки») — база (Б/Ж/У/покой) неполная или пустая целиком → цели нет,
+ * high/low неполные (хоть одно поле своей тройки) → этот тип дня
+ * недоступен на выбор. «На 100 ккал» пустое — не блокирует цель, просто 0
+ * (нет бонуса от активности), особого «не задано» ему не нужно.
+ */
 export interface GoalInput {
-  baseProtein: number
-  baseFat: number
-  baseCarbs: number
-  restingKcal: number
-  perHundredProtein: number
-  perHundredFat: number
-  perHundredCarbs: number
-  highDeltaProtein: number
-  highDeltaFat: number
-  highDeltaCarbs: number
-  lowDeltaProtein: number
-  lowDeltaFat: number
-  lowDeltaCarbs: number
+  baseProtein: number | null
+  baseFat: number | null
+  baseCarbs: number | null
+  restingKcal: number | null
+  perHundredProtein: number | null
+  perHundredFat: number | null
+  perHundredCarbs: number | null
+  highDeltaProtein: number | null
+  highDeltaFat: number | null
+  highDeltaCarbs: number | null
+  lowDeltaProtein: number | null
+  lowDeltaFat: number | null
+  lowDeltaCarbs: number | null
 }
 
 export interface DayGoal {
@@ -39,6 +46,11 @@ export interface DayGoal {
   changedByActivity: boolean
 }
 
+/** Есть полная база (Б/Ж/У + покой) — без неё цели не бывает вообще (владелица: «без цели тоже можно жить»). */
+export function hasBaseGoal(settings: Pick<GoalInput, 'baseProtein' | 'baseFat' | 'baseCarbs' | 'restingKcal'>): boolean {
+  return settings.baseProtein !== null && settings.baseFat !== null && settings.baseCarbs !== null && settings.restingKcal !== null
+}
+
 /**
  * Без настроек и активности: цель = база, потрачено = покой (README
  * «Без синхронизации и ручных записей»). Прибавка только положительная —
@@ -48,22 +60,25 @@ export interface DayGoal {
  * `changedByActivity` — не «была ли активность», а «хоть один макрос
  * реально вырос»: при перекосе настроек «на 100 ккал» в 0/0/0 по всем
  * макросам активность есть, а цель не двигается — ⚡ показывать нечего.
+ *
+ * База неполная (или её вовсе нет) — цели не бывает, `null`.
  */
-export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGoal {
+export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGoal | null {
+  if (!hasBaseGoal(settings)) return null
   const clampedActivity = Math.max(0, activityKcal)
-  const protein = settings.baseProtein + (clampedActivity / 100) * settings.perHundredProtein
-  const fat = settings.baseFat + (clampedActivity / 100) * settings.perHundredFat
-  const carbs = settings.baseCarbs + (clampedActivity / 100) * settings.perHundredCarbs
-  const proteinChanged = protein > settings.baseProtein
-  const fatChanged = fat > settings.baseFat
-  const carbsChanged = carbs > settings.baseCarbs
+  const protein = settings.baseProtein! + (clampedActivity / 100) * (settings.perHundredProtein ?? 0)
+  const fat = settings.baseFat! + (clampedActivity / 100) * (settings.perHundredFat ?? 0)
+  const carbs = settings.baseCarbs! + (clampedActivity / 100) * (settings.perHundredCarbs ?? 0)
+  const proteinChanged = protein > settings.baseProtein!
+  const fatChanged = fat > settings.baseFat!
+  const carbsChanged = carbs > settings.baseCarbs!
   return {
     protein,
     fat,
     carbs,
     kcal: kcalFromMacros(protein, fat, carbs),
     activityKcal: clampedActivity,
-    spentKcal: settings.restingKcal + clampedActivity,
+    spentKcal: settings.restingKcal! + clampedActivity,
     proteinChanged,
     fatChanged,
     carbsChanged,
@@ -119,12 +134,26 @@ export interface DayTypeDelta {
   carbs: number
 }
 
-/** Поправка «вручную» — из текущей версии настроек (та же, что база). */
-export function manualDayTypeDelta(kind: DayTypeKind, settings: GoalInput): DayTypeDelta {
+/**
+ * Поправка настроена — все три её поля заданы разом (частично заполненная
+ * тройка — то же самое, что не заполненная: недостаточно данных, чтобы
+ * понять, что имелось в виду). Этим типом дня нельзя воспользоваться, пока
+ * не задано целиком — кнопка в дневнике неактивна (DiaryView.vue).
+ */
+export function isDayTypeDeltaConfigured(kind: DayTypeKind, settings: GoalInput): boolean {
   if (kind === 'high') {
-    return { protein: settings.highDeltaProtein, fat: settings.highDeltaFat, carbs: settings.highDeltaCarbs }
+    return settings.highDeltaProtein !== null && settings.highDeltaFat !== null && settings.highDeltaCarbs !== null
   }
-  return { protein: -settings.lowDeltaProtein, fat: -settings.lowDeltaFat, carbs: -settings.lowDeltaCarbs }
+  return settings.lowDeltaProtein !== null && settings.lowDeltaFat !== null && settings.lowDeltaCarbs !== null
+}
+
+/** Поправка «вручную» — из текущей версии настроек (та же, что база). `null` — не настроено целиком. */
+export function manualDayTypeDelta(kind: DayTypeKind, settings: GoalInput): DayTypeDelta | null {
+  if (!isDayTypeDeltaConfigured(kind, settings)) return null
+  if (kind === 'high') {
+    return { protein: settings.highDeltaProtein!, fat: settings.highDeltaFat!, carbs: settings.highDeltaCarbs! }
+  }
+  return { protein: -settings.lowDeltaProtein!, fat: -settings.lowDeltaFat!, carbs: -settings.lowDeltaCarbs! }
 }
 
 /**
@@ -134,7 +163,8 @@ export function manualDayTypeDelta(kind: DayTypeKind, settings: GoalInput): DayT
  * базовой целью параллельно поправке на активность»). Сегодняшний день (и
  * будущие) в расчёт не берём — у него ещё не может быть факта. Дни без
  * единой записи в `entries` из среднего исключаются (иначе занизили бы
- * его нулём, хотя на самом деле просто не открывала приложение).
+ * его нулём, хотя на самом деле просто не открывала приложение). Без базы
+ * вычитать не из чего — `null` (тот же случай, что и «нет цели вообще»).
  */
 export function statsDayTypeDelta(
   kind: DayTypeKind,
@@ -144,6 +174,7 @@ export function statsDayTypeDelta(
   periodDays: number | null,
   today: string,
 ): DayTypeDelta | null {
+  if (base.baseProtein === null || base.baseFat === null || base.baseCarbs === null) return null
   const cutoff = periodDays !== null ? shiftDate(today, -periodDays) : null
   const matchingDates = new Set(
     dayTypeRows.filter((d) => d.actual === kind && d.date < today && (!cutoff || d.date >= cutoff)).map((d) => d.date),

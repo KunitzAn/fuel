@@ -63,7 +63,7 @@ function pickPlan(kind: DayTypeKind | null) {
     void setPlannedDayType(date.value, null)
     return
   }
-  if (!currentGoalSettings.value) return // без базовых целей поправку не из чего считать
+  if (!activityGoal.value) return // без базовых целей поправку не из чего считать
   pickingDayTypeKind.value = kind
 }
 function onDayTypePicked(plan: DayTypePlan) {
@@ -166,7 +166,7 @@ onBeforeRouteLeave((to) => {
           </button>
           <button
             type="button"
-            :disabled="!currentGoalSettings"
+            :disabled="!activityGoal"
             @click="pickPlan('high')"
             class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
             :class="dayType?.planned === 'high' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'"
@@ -175,7 +175,7 @@ onBeforeRouteLeave((to) => {
           </button>
           <button
             type="button"
-            :disabled="!currentGoalSettings"
+            :disabled="!activityGoal"
             @click="pickPlan('low')"
             class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
             :class="dayType?.planned === 'low' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'"

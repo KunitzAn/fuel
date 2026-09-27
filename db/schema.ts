@@ -139,23 +139,29 @@ export const goalSettings = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     validFrom: text('valid_from').notNull(), // YYYY-MM-DD
-    baseProtein: real('base_protein').notNull(),
-    baseFat: real('base_fat').notNull(),
-    baseCarbs: real('base_carbs').notNull(),
-    restingKcal: real('resting_kcal').notNull(),
-    perHundredProtein: real('per_hundred_protein').notNull(),
-    perHundredFat: real('per_hundred_fat').notNull(),
-    perHundredCarbs: real('per_hundred_carbs').notNull(),
+    // Все числовые поля ниже — необязательные (владелица: «это все
+    // необязательные настройки»). База (Б/Ж/У/покой) пустая или неполная —
+    // цель на день просто не показывается, только факт (README «Цели и
+    // энергия»). «На 100 ккал» пустое — 0 (уже и так «нет бонуса», особый
+    // null не нужен). High/low пустые (хоть один макрос) — этот тип дня
+    // недоступен на выбор, кнопка в дневнике неактивна (src/lib/goals.ts).
+    baseProtein: real('base_protein'),
+    baseFat: real('base_fat'),
+    baseCarbs: real('base_carbs'),
+    restingKcal: real('resting_kcal'),
+    perHundredProtein: real('per_hundred_protein'),
+    perHundredFat: real('per_hundred_fat'),
+    perHundredCarbs: real('per_hundred_carbs'),
     // Поправка для типа дня (этап 4.4, не из README — новая мысль
     // владелицы) — та же версия, что и база: правка действует с
     // сегодняшнего дня. High — прибавка, low хранится как положительная
     // величина «убавки» (см. src/lib/goals.ts → manualDayTypeDelta).
-    highDeltaProtein: real('high_delta_protein').notNull().default(0),
-    highDeltaFat: real('high_delta_fat').notNull().default(0),
-    highDeltaCarbs: real('high_delta_carbs').notNull().default(0),
-    lowDeltaProtein: real('low_delta_protein').notNull().default(0),
-    lowDeltaFat: real('low_delta_fat').notNull().default(0),
-    lowDeltaCarbs: real('low_delta_carbs').notNull().default(0),
+    highDeltaProtein: real('high_delta_protein'),
+    highDeltaFat: real('high_delta_fat'),
+    highDeltaCarbs: real('high_delta_carbs'),
+    lowDeltaProtein: real('low_delta_protein'),
+    lowDeltaFat: real('low_delta_fat'),
+    lowDeltaCarbs: real('low_delta_carbs'),
     ...syncColumns,
   },
   (t) => [index('goal_settings_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
