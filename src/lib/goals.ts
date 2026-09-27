@@ -53,6 +53,11 @@ export function sumActivityKcal(activities: Pick<Activity, 'kcal'>[]): number {
   return activities.reduce((sum, a) => sum + a.kcal, 0)
 }
 
+/** README: «разница = съедено − потрачено» — минус означает дефицит. */
+export function energyDifference(eatenKcal: number, spentKcal: number): number {
+  return eatenKcal - spentKcal
+}
+
 /**
  * Версия настроек, действующая на дату: максимальный `validFrom ≤ date`;
  * при нескольких правках в один день (тот же validFrom) — более новая по

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeDayGoal, pickGoalSettingsForDate, sumActivityKcal } from './goals'
+import { computeDayGoal, energyDifference, pickGoalSettingsForDate, sumActivityKcal } from './goals'
 
 const settings = {
   baseProtein: 120,
@@ -50,6 +50,13 @@ describe('sumActivityKcal', () => {
   })
   it('без активностей — 0', () => {
     expect(sumActivityKcal([])).toBe(0)
+  })
+})
+
+describe('energyDifference', () => {
+  it('минус — дефицит, плюс — избыток', () => {
+    expect(energyDifference(1300, 1950)).toBe(-650)
+    expect(energyDifference(2000, 1950)).toBe(50)
   })
 })
 
