@@ -56,11 +56,46 @@ export interface Setting {
   value: string
 }
 
+/** Ручная активность и (этап 5) тренировки с Apple Watch — README «Цели и энергия». */
+export interface Activity {
+  id: string
+  date: string
+  source: 'watch' | 'manual'
+  name: string | null
+  kcal: number
+  externalId: string | null
+  startedAt: string | null
+  durationMin: number | null
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+  dirty: boolean
+}
+
+/** Версия настроек целей, действует с `validFrom` (README «История настроек целей»). */
+export interface GoalSettings {
+  id: string
+  validFrom: string // YYYY-MM-DD
+  baseProtein: number
+  baseFat: number
+  baseCarbs: number
+  restingKcal: number
+  perHundredProtein: number
+  perHundredFat: number
+  perHundredCarbs: number
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+  dirty: boolean
+}
+
 export const db = new Dexie('fuel') as Dexie & {
   foods: EntityTable<Food, 'id'>
   snacks: EntityTable<Snack, 'id'>
   entries: EntityTable<Entry, 'id'>
   settings: EntityTable<Setting, 'key'>
+  activities: EntityTable<Activity, 'id'>
+  goalSettings: EntityTable<GoalSettings, 'id'>
 }
 
 db.version(1).stores({
@@ -70,4 +105,11 @@ db.version(1).stores({
   // граммов («подставить прошлые граммы этого продукта») и раскрытие перекуса
   entries: 'id, date, foodId, snackId, dirty, deletedAt',
   settings: 'key',
+})
+
+db.version(2).stores({
+  activities: 'id, date, dirty, deletedAt',
+  // validFrom — не уникален: возможны две версии за один день (несколько
+  // правок), выбор нужной — src/lib/goals.ts, не индекс
+  goalSettings: 'id, validFrom, dirty, deletedAt',
 })

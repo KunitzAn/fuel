@@ -100,6 +100,57 @@ export const snacks = pgTable(
   (t) => [index('snacks_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
 )
 
+/**
+ * Ручная активность и (позже, этап 5) тренировки с Apple Watch — обе влияют
+ * на «потрачено» и на цель дня (README «Цели и энергия»). `externalId`/
+ * `startedAt`/`durationMin` пока не заполняются (source всегда 'manual') —
+ * задел под этап 5, чтобы потом не делать вторую миграцию.
+ */
+export const activities = pgTable(
+  'activities',
+  {
+    id: text('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(),
+    source: text('source').notNull(), // 'watch' | 'manual'
+    name: text('name'),
+    kcal: real('kcal').notNull(),
+    externalId: text('external_id'), // id тренировки из Здоровья (этап 5)
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    durationMin: real('duration_min'),
+    ...syncColumns,
+  },
+  (t) => [index('activities_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
+)
+
+/**
+ * Версии настроек целей — правка действует с сегодняшнего дня, прошлые дни
+ * остаются со своими цифрами (README «История настроек целей»). Для дня
+ * берём версию с максимальным `validFrom ≤ дата` (при нескольких правках в
+ * один день — дальше по `createdAt`, см. src/lib/goals.ts).
+ */
+export const goalSettings = pgTable(
+  'goal_settings',
+  {
+    id: text('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    validFrom: text('valid_from').notNull(), // YYYY-MM-DD
+    baseProtein: real('base_protein').notNull(),
+    baseFat: real('base_fat').notNull(),
+    baseCarbs: real('base_carbs').notNull(),
+    restingKcal: real('resting_kcal').notNull(),
+    perHundredProtein: real('per_hundred_protein').notNull(),
+    perHundredFat: real('per_hundred_fat').notNull(),
+    perHundredCarbs: real('per_hundred_carbs').notNull(),
+    ...syncColumns,
+  },
+  (t) => [index('goal_settings_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
+)
+
 /** Записи дневника — снимок КБЖУ на момент добавления, правка продукта их не меняет. */
 export const entries = pgTable(
   'entries',

@@ -1,9 +1,15 @@
 <script setup lang="ts">
-// Цели — этап 4, токен Команды iOS — этап 5.
-import { onMounted, ref } from 'vue'
+// Токен Команды iOS — этап 5.
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { checkSession, logout, me } from '../lib/auth'
+import { todayLocalDate } from '../lib/date'
+import { db } from '../lib/db'
+import { saveGoalSettings } from '../lib/goalSettings'
+import { pickGoalSettingsForDate } from '../lib/goals'
+import { kcalFromMacros, parseDecimal } from '../lib/nutrition'
 import { lastSyncError, pendingCount, runSync, syncing } from '../lib/sync'
+import { useLiveQuery } from '../lib/useLiveQuery'
 
 // Если сессия уже известна — показываем сразу, не ждём сети (без неё на
 // iOS проверка может висеть до таймаута).
@@ -25,6 +31,70 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     offlineReady.value = !!navigator.serviceWorker.controller
   })
+}
+
+// Цели (этап 4.1, README «Цели и энергия»). Версия, действующая сегодня —
+// источник для предзаполнения формы; сохранение всегда создаёт новую
+// версию (goalSettings.ts), эта не трогается.
+const goalRows = useLiveQuery(() => db.goalSettings.filter((g) => g.deletedAt === null).toArray(), [])
+const currentGoalSettings = computed(() => pickGoalSettingsForDate(goalRows.value, todayLocalDate()))
+
+const baseProteinInput = ref('')
+const baseFatInput = ref('')
+const baseCarbsInput = ref('')
+const restingKcalInput = ref('')
+const perHundredProteinInput = ref('')
+const perHundredFatInput = ref('')
+const perHundredCarbsInput = ref('')
+
+// Предзаполняем один раз, как только текущая версия действительно
+// загрузилась — дальше это черновик формы, синк его не переписывает.
+watch(
+  currentGoalSettings,
+  (s) => {
+    if (!s) return
+    baseProteinInput.value = String(s.baseProtein)
+    baseFatInput.value = String(s.baseFat)
+    baseCarbsInput.value = String(s.baseCarbs)
+    restingKcalInput.value = String(s.restingKcal)
+    perHundredProteinInput.value = String(s.perHundredProtein)
+    perHundredFatInput.value = String(s.perHundredFat)
+    perHundredCarbsInput.value = String(s.perHundredCarbs)
+  },
+  { once: true },
+)
+
+const baseKcal = computed(() =>
+  kcalFromMacros(parseDecimal(baseProteinInput.value) ?? 0, parseDecimal(baseFatInput.value) ?? 0, parseDecimal(baseCarbsInput.value) ?? 0),
+)
+const perHundredKcalHint = computed(() =>
+  kcalFromMacros(
+    parseDecimal(perHundredProteinInput.value) ?? 0,
+    parseDecimal(perHundredFatInput.value) ?? 0,
+    parseDecimal(perHundredCarbsInput.value) ?? 0,
+  ),
+)
+
+const canSaveGoals = computed(() =>
+  [baseProteinInput, baseFatInput, baseCarbsInput, restingKcalInput, perHundredProteinInput, perHundredFatInput, perHundredCarbsInput].every(
+    (r) => parseDecimal(r.value) !== null,
+  ),
+)
+
+const goalsSavedJustNow = ref(false)
+async function saveGoals() {
+  if (!canSaveGoals.value) return
+  await saveGoalSettings({
+    baseProtein: parseDecimal(baseProteinInput.value)!,
+    baseFat: parseDecimal(baseFatInput.value)!,
+    baseCarbs: parseDecimal(baseCarbsInput.value)!,
+    restingKcal: parseDecimal(restingKcalInput.value)!,
+    perHundredProtein: parseDecimal(perHundredProteinInput.value)!,
+    perHundredFat: parseDecimal(perHundredFatInput.value)!,
+    perHundredCarbs: parseDecimal(perHundredCarbsInput.value)!,
+  })
+  goalsSavedJustNow.value = true
+  setTimeout(() => (goalsSavedJustNow.value = false), 2000)
 }
 </script>
 
@@ -75,6 +145,66 @@ if ('serviceWorker' in navigator) {
       </p>
     </section>
 
-    <p class="mt-4 text-muted">Здесь будут цели и синхронизация тренировок.</p>
+    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-4">
+      <h2 class="text-sm font-semibold text-ink">Цели</h2>
+
+      <div class="flex flex-col gap-1">
+        <span class="text-xs text-muted">Цель по умолчанию (день без активности)</span>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Белки, г</span>
+            <input v-model="baseProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Жиры, г</span>
+            <input v-model="baseFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Углеводы, г</span>
+            <input v-model="baseCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+        </div>
+        <p class="text-xs text-muted">= {{ Math.round(baseKcal) }} ккал, считается из БЖУ</p>
+      </div>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-muted">Энергия покоя, ккал</span>
+        <input v-model="restingKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+      </label>
+
+      <div class="flex flex-col gap-1">
+        <span class="text-xs text-muted">На каждые 100 ккал активности — прибавка к цели</span>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Б, г</span>
+            <input v-model="perHundredProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ж, г</span>
+            <input v-model="perHundredFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">У, г</span>
+            <input v-model="perHundredCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+        </div>
+        <p class="text-xs text-muted">≈ {{ Math.round(perHundredKcalHint) }} ккал — подсказка, не входит в расчёт</p>
+      </div>
+
+      <p class="text-xs text-muted">
+        Прибавка от активности только положительная — цель не опускается ниже дефолтной. Изменение действует с сегодняшнего дня, прошлые дни остаются со своими цифрами.
+      </p>
+
+      <button
+        type="button"
+        :disabled="!canSaveGoals"
+        @click="saveGoals"
+        class="rounded-2xl py-3 text-sm font-medium text-white bg-accent disabled:opacity-40"
+      >
+        {{ goalsSavedJustNow ? 'Сохранено' : 'Сохранить' }}
+      </button>
+    </section>
+
+    <p class="mt-4 text-muted">Здесь будет синхронизация тренировок (этап 5).</p>
   </main>
 </template>

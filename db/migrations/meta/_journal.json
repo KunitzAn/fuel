@@ -15,6 +15,13 @@
       "when": 1790321431856,
       "tag": "0001_boring_kronos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790498256766,
+      "tag": "0002_panoramic_nicolaos",
+      "breakpoints": true
     }
   ]
 }

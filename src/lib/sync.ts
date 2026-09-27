@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { checkSession, me } from './auth'
 import { api } from './api'
-import { db, type Entry, type Food, type Snack } from './db'
+import { db, type Activity, type Entry, type Food, type GoalSettings, type Snack } from './db'
 
 const LAST_SYNCED_AT_KEY = 'lastSyncedAt'
 const SYNCED_USER_ID_KEY = 'syncedUserId'
@@ -20,11 +20,13 @@ interface SyncResponse {
   foods: Omit<Food, 'dirty'>[]
   snacks: Omit<Snack, 'dirty'>[]
   entries: Omit<Entry, 'dirty'>[]
+  activities: Omit<Activity, 'dirty'>[]
+  goalSettings: Omit<GoalSettings, 'dirty'>[]
 }
 
 interface PushResponse {
   serverTime: string
-  accepted: { foods: string[]; snacks: string[]; entries: string[] }
+  accepted: { foods: string[]; snacks: string[]; entries: string[]; activities: string[]; goalSettings: string[] }
 }
 
 async function getLastSyncedAt(): Promise<string | null> {
@@ -48,10 +50,12 @@ async function getSyncedUserId(): Promise<number | null> {
  * новее чужой синхронизации, то есть почти ничего).
  */
 async function resetLocalDiary(): Promise<void> {
-  await db.transaction('rw', db.foods, db.snacks, db.entries, db.settings, async () => {
+  await db.transaction('rw', [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.settings], async () => {
     await db.foods.clear()
     await db.snacks.clear()
     await db.entries.clear()
+    await db.activities.clear()
+    await db.goalSettings.clear()
     await db.settings.delete(LAST_SYNCED_AT_KEY)
   })
 }
@@ -64,7 +68,7 @@ async function resetLocalDiary(): Promise<void> {
  * обычный мёрж по `updatedAt` подходит и для первого синка тоже.
  */
 async function mergePulled(res: SyncResponse): Promise<void> {
-  await db.transaction('rw', db.foods, db.snacks, db.entries, async () => {
+  await db.transaction('rw', [db.foods, db.snacks, db.entries, db.activities, db.goalSettings], async () => {
     for (const f of res.foods) {
       const local = await db.foods.get(f.id)
       if (!local || new Date(local.updatedAt) < new Date(f.updatedAt)) {
@@ -83,6 +87,18 @@ async function mergePulled(res: SyncResponse): Promise<void> {
         await db.entries.put({ ...e, dirty: false })
       }
     }
+    for (const a of res.activities) {
+      const local = await db.activities.get(a.id)
+      if (!local || new Date(local.updatedAt) < new Date(a.updatedAt)) {
+        await db.activities.put({ ...a, dirty: false })
+      }
+    }
+    for (const g of res.goalSettings) {
+      const local = await db.goalSettings.get(g.id)
+      if (!local || new Date(local.updatedAt) < new Date(g.updatedAt)) {
+        await db.goalSettings.put({ ...g, dirty: false })
+      }
+    }
   })
 }
 
@@ -90,6 +106,8 @@ interface PushChunk {
   foods: Food[]
   snacks: Snack[]
   entries: Entry[]
+  activities: Activity[]
+  goalSettings: GoalSettings[]
 }
 
 /**
@@ -98,29 +116,40 @@ interface PushChunk {
  * них ссылаться (FK) — сервер обрабатывает foods → snacks → entries внутри
  * одного запроса (см. functions/api/sync.ts), так что для обычных объёмов
  * (десятки строк) связанные foods/snacks и entries всегда попадают в один
- * и тот же или более ранний чанк.
+ * и тот же или более ранний чанк. Activities/goalSettings ни на что не
+ * ссылаются — режутся тем же индексом просто для единообразия.
  */
-function chunkPush(foodsArr: Food[], snacksArr: Snack[], entriesArr: Entry[]): PushChunk[] {
-  const max = Math.max(foodsArr.length, snacksArr.length, entriesArr.length)
-  if (max === 0) return [{ foods: [], snacks: [], entries: [] }]
+function chunkPush(
+  foodsArr: Food[],
+  snacksArr: Snack[],
+  entriesArr: Entry[],
+  activitiesArr: Activity[],
+  goalSettingsArr: GoalSettings[],
+): PushChunk[] {
+  const max = Math.max(foodsArr.length, snacksArr.length, entriesArr.length, activitiesArr.length, goalSettingsArr.length)
+  if (max === 0) return [{ foods: [], snacks: [], entries: [], activities: [], goalSettings: [] }]
   const chunks: PushChunk[] = []
   for (let i = 0; i < max; i += PUSH_CHUNK_SIZE) {
     chunks.push({
       foods: foodsArr.slice(i, i + PUSH_CHUNK_SIZE),
       snacks: snacksArr.slice(i, i + PUSH_CHUNK_SIZE),
       entries: entriesArr.slice(i, i + PUSH_CHUNK_SIZE),
+      activities: activitiesArr.slice(i, i + PUSH_CHUNK_SIZE),
+      goalSettings: goalSettingsArr.slice(i, i + PUSH_CHUNK_SIZE),
     })
   }
   return chunks
 }
 
 async function updatePendingCount(): Promise<void> {
-  const [foodsAll, snacksAll, entriesAll] = await Promise.all([
+  const [foodsAll, snacksAll, entriesAll, activitiesAll, goalSettingsAll] = await Promise.all([
     db.foods.toArray(),
     db.snacks.toArray(),
     db.entries.toArray(),
+    db.activities.toArray(),
+    db.goalSettings.toArray(),
   ])
-  pendingCount.value = [...foodsAll, ...snacksAll, ...entriesAll].filter((r) => r.dirty).length
+  pendingCount.value = [...foodsAll, ...snacksAll, ...entriesAll, ...activitiesAll, ...goalSettingsAll].filter((r) => r.dirty).length
 }
 
 /**
@@ -155,24 +184,32 @@ export async function runSync(): Promise<void> {
     const dirtyFoods = (await db.foods.toArray()).filter((f) => f.dirty)
     const dirtySnacks = (await db.snacks.toArray()).filter((s) => s.dirty)
     const dirtyEntries = (await db.entries.toArray()).filter((e) => e.dirty)
+    const dirtyActivities = (await db.activities.toArray()).filter((a) => a.dirty)
+    const dirtyGoalSettings = (await db.goalSettings.toArray()).filter((g) => g.dirty)
 
     const acceptedFoods = new Set<string>()
     const acceptedSnacks = new Set<string>()
     const acceptedEntries = new Set<string>()
+    const acceptedActivities = new Set<string>()
+    const acceptedGoalSettings = new Set<string>()
     let latestServerTime = pulled.serverTime
 
-    for (const chunk of chunkPush(dirtyFoods, dirtySnacks, dirtyEntries)) {
-      if (!chunk.foods.length && !chunk.snacks.length && !chunk.entries.length) continue
+    for (const chunk of chunkPush(dirtyFoods, dirtySnacks, dirtyEntries, dirtyActivities, dirtyGoalSettings)) {
+      if (!chunk.foods.length && !chunk.snacks.length && !chunk.entries.length && !chunk.activities.length && !chunk.goalSettings.length) continue
       const pushed = await api.post<PushResponse>('/api/sync', chunk)
       pushed.accepted.foods.forEach((id) => acceptedFoods.add(id))
       pushed.accepted.snacks.forEach((id) => acceptedSnacks.add(id))
       pushed.accepted.entries.forEach((id) => acceptedEntries.add(id))
+      pushed.accepted.activities.forEach((id) => acceptedActivities.add(id))
+      pushed.accepted.goalSettings.forEach((id) => acceptedGoalSettings.add(id))
       latestServerTime = pushed.serverTime
     }
 
     await db.foods.where('id').anyOf([...acceptedFoods]).modify({ dirty: false })
     await db.snacks.where('id').anyOf([...acceptedSnacks]).modify({ dirty: false })
     await db.entries.where('id').anyOf([...acceptedEntries]).modify({ dirty: false })
+    await db.activities.where('id').anyOf([...acceptedActivities]).modify({ dirty: false })
+    await db.goalSettings.where('id').anyOf([...acceptedGoalSettings]).modify({ dirty: false })
 
     await setLastSyncedAt(latestServerTime)
     await db.settings.put({ key: SYNCED_USER_ID_KEY, value: String(session.userId) })

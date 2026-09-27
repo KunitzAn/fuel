@@ -1,5 +1,5 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
-import { entries, foods, snacks } from '../../db/schema'
+import { activities, entries, foods, goalSettings, snacks } from '../../db/schema'
 import type { AuthedData } from '../_lib/context'
 import { getDb, type Db } from '../_lib/db'
 import type { Env } from '../_lib/env'
@@ -29,6 +29,35 @@ interface WireSnack {
   after: 'breakfast' | 'lunch' | 'dinner'
   name: string
   position: number
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+interface WireActivity {
+  id: string
+  date: string
+  source: 'watch' | 'manual'
+  name: string | null
+  kcal: number
+  externalId: string | null
+  startedAt: string | null
+  durationMin: number | null
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+interface WireGoalSettings {
+  id: string
+  validFrom: string
+  baseProtein: number
+  baseFat: number
+  baseCarbs: number
+  restingKcal: number
+  perHundredProtein: number
+  perHundredFat: number
+  perHundredCarbs: number
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -67,7 +96,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
   const since = new URL(ctx.request.url).searchParams.get('since')
   const sinceDate = since ? new Date(since) : null
 
-  const [foodRows, snackRows, entryRows] = await Promise.all([
+  const [foodRows, snackRows, entryRows, activityRows, goalSettingsRows] = await Promise.all([
     db
       .select()
       .from(foods)
@@ -85,6 +114,22 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
         sinceDate
           ? and(eq(entries.userId, userId), gt(entries.serverUpdatedAt, sinceDate))
           : eq(entries.userId, userId),
+      ),
+    db
+      .select()
+      .from(activities)
+      .where(
+        sinceDate
+          ? and(eq(activities.userId, userId), gt(activities.serverUpdatedAt, sinceDate))
+          : eq(activities.userId, userId),
+      ),
+    db
+      .select()
+      .from(goalSettings)
+      .where(
+        sinceDate
+          ? and(eq(goalSettings.userId, userId), gt(goalSettings.serverUpdatedAt, sinceDate))
+          : eq(goalSettings.userId, userId),
       ),
   ])
 
@@ -135,6 +180,33 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       updatedAt: e.updatedAt.toISOString(),
       deletedAt: e.deletedAt?.toISOString() ?? null,
     })),
+    activities: activityRows.map((a) => ({
+      id: a.id,
+      date: a.date,
+      source: a.source,
+      name: a.name,
+      kcal: a.kcal,
+      externalId: a.externalId,
+      startedAt: a.startedAt?.toISOString() ?? null,
+      durationMin: a.durationMin,
+      createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
+      deletedAt: a.deletedAt?.toISOString() ?? null,
+    })),
+    goalSettings: goalSettingsRows.map((g) => ({
+      id: g.id,
+      validFrom: g.validFrom,
+      baseProtein: g.baseProtein,
+      baseFat: g.baseFat,
+      baseCarbs: g.baseCarbs,
+      restingKcal: g.restingKcal,
+      perHundredProtein: g.perHundredProtein,
+      perHundredFat: g.perHundredFat,
+      perHundredCarbs: g.perHundredCarbs,
+      createdAt: g.createdAt.toISOString(),
+      updatedAt: g.updatedAt.toISOString(),
+      deletedAt: g.deletedAt?.toISOString() ?? null,
+    })),
   })
 }
 
@@ -155,16 +227,26 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
     foods?: WireFood[]
     snacks?: WireSnack[]
     entries?: WireEntry[]
+    activities?: WireActivity[]
+    goalSettings?: WireGoalSettings[]
   }>(ctx.request)
   if (!body) return error(400, 'invalid_body')
 
   const acceptedFoods = await upsertFoods(db, userId, body.foods ?? [])
   const acceptedSnacks = await upsertSnacks(db, userId, body.snacks ?? [])
   const acceptedEntries = await upsertEntries(db, userId, body.entries ?? [])
+  const acceptedActivities = await upsertActivities(db, userId, body.activities ?? [])
+  const acceptedGoalSettings = await upsertGoalSettings(db, userId, body.goalSettings ?? [])
 
   return json({
     serverTime: new Date().toISOString(),
-    accepted: { foods: acceptedFoods, snacks: acceptedSnacks, entries: acceptedEntries },
+    accepted: {
+      foods: acceptedFoods,
+      snacks: acceptedSnacks,
+      entries: acceptedEntries,
+      activities: acceptedActivities,
+      goalSettings: acceptedGoalSettings,
+    },
   })
 }
 
@@ -308,5 +390,89 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
       setWhere: sql`${entries.userId} = ${userId} and excluded.updated_at > ${entries.updatedAt}`,
     })
     .returning({ id: entries.id })
+  return accepted.map((r) => r.id)
+}
+
+async function upsertActivities(db: Db, userId: number, rows: WireActivity[]): Promise<string[]> {
+  if (rows.length === 0) return []
+  const accepted = await db
+    .insert(activities)
+    .values(
+      rows.map((a) => ({
+        id: a.id,
+        userId,
+        date: a.date,
+        source: a.source,
+        name: a.name,
+        kcal: a.kcal,
+        externalId: a.externalId,
+        startedAt: a.startedAt ? new Date(a.startedAt) : null,
+        durationMin: a.durationMin,
+        createdAt: new Date(a.createdAt),
+        updatedAt: new Date(a.updatedAt),
+        serverUpdatedAt: sql`now()`,
+        deletedAt: a.deletedAt ? new Date(a.deletedAt) : null,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: activities.id,
+      set: {
+        date: sql`excluded.date`,
+        source: sql`excluded.source`,
+        name: sql`excluded.name`,
+        kcal: sql`excluded.kcal`,
+        externalId: sql`excluded.external_id`,
+        startedAt: sql`excluded.started_at`,
+        durationMin: sql`excluded.duration_min`,
+        updatedAt: sql`excluded.updated_at`,
+        serverUpdatedAt: sql`now()`,
+        deletedAt: sql`excluded.deleted_at`,
+      },
+      setWhere: sql`${activities.userId} = ${userId} and excluded.updated_at > ${activities.updatedAt}`,
+    })
+    .returning({ id: activities.id })
+  return accepted.map((r) => r.id)
+}
+
+async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings[]): Promise<string[]> {
+  if (rows.length === 0) return []
+  const accepted = await db
+    .insert(goalSettings)
+    .values(
+      rows.map((g) => ({
+        id: g.id,
+        userId,
+        validFrom: g.validFrom,
+        baseProtein: g.baseProtein,
+        baseFat: g.baseFat,
+        baseCarbs: g.baseCarbs,
+        restingKcal: g.restingKcal,
+        perHundredProtein: g.perHundredProtein,
+        perHundredFat: g.perHundredFat,
+        perHundredCarbs: g.perHundredCarbs,
+        createdAt: new Date(g.createdAt),
+        updatedAt: new Date(g.updatedAt),
+        serverUpdatedAt: sql`now()`,
+        deletedAt: g.deletedAt ? new Date(g.deletedAt) : null,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: goalSettings.id,
+      set: {
+        validFrom: sql`excluded.valid_from`,
+        baseProtein: sql`excluded.base_protein`,
+        baseFat: sql`excluded.base_fat`,
+        baseCarbs: sql`excluded.base_carbs`,
+        restingKcal: sql`excluded.resting_kcal`,
+        perHundredProtein: sql`excluded.per_hundred_protein`,
+        perHundredFat: sql`excluded.per_hundred_fat`,
+        perHundredCarbs: sql`excluded.per_hundred_carbs`,
+        updatedAt: sql`excluded.updated_at`,
+        serverUpdatedAt: sql`now()`,
+        deletedAt: sql`excluded.deleted_at`,
+      },
+      setWhere: sql`${goalSettings.userId} = ${userId} and excluded.updated_at > ${goalSettings.updatedAt}`,
+    })
+    .returning({ id: goalSettings.id })
   return accepted.map((r) => r.id)
 }
