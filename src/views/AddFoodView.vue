@@ -3,9 +3,11 @@ import { ArrowLeft, ChevronDown, ListChecks, ScanLine } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddEntrySheet from '../components/AddEntrySheet.vue'
+import BarcodeScannerSheet from '../components/BarcodeScannerSheet.vue'
 import FoodFormSheet from '../components/FoodFormSheet.vue'
 import FoodListRow from '../components/FoodListRow.vue'
 import MealTargetSheet from '../components/MealTargetSheet.vue'
+import { fetchCatalogByBarcode } from '../lib/barcode'
 import { useCatalogSearch } from '../lib/catalog'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
 import { db, type Entry } from '../lib/db'
@@ -127,11 +129,37 @@ async function quickAdd(item: PickItem) {
 const opening = ref<PickItem | null>(null)
 
 const creatingKind = ref<'product' | 'dish' | null>(null)
-async function onFoodSaved(id: string, addNow: boolean) {
+const presetBarcode = ref<string | undefined>(undefined)
+function closeCreating() {
   creatingKind.value = null
+  presetBarcode.value = undefined
+}
+async function onFoodSaved(id: string, addNow: boolean) {
+  closeCreating()
   if (!addNow) return
   const food = await db.foods.get(id)
   if (food) opening.value = pickFromFood(food)
+}
+
+// Сканер (этап 3, README «Штрихкод»): сначала свои продукты — офлайн,
+// потом каталог/живой OFF (lib/barcode.ts), не нашлось нигде — форма
+// нового продукта со штрихкодом.
+const scanning = ref(false)
+async function onBarcodeDetected(code: string) {
+  scanning.value = false
+  const localFood = allFoods.value.find((f) => f.barcode === code)
+  if (localFood) {
+    opening.value = pickFromFood(localFood)
+    return
+  }
+  const lookup = await fetchCatalogByBarcode(code)
+  if (lookup.status === 'found') {
+    const version = myVersionByCatalog.value.get(lookup.item.id)
+    opening.value = version ? pickFromFood(version) : pickFromCatalog(lookup.item, lastGramsByCatalog.value.get(lookup.item.id) ?? null)
+    return
+  }
+  presetBarcode.value = code
+  creatingKind.value = 'product'
 }
 
 function afterAdd() {
@@ -223,8 +251,7 @@ function titleFor(item: PickItem): string {
           placeholder="Поиск…"
           class="flex-1 rounded-2xl bg-card border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
-        <!-- Сканер штрихкода — этап 3 -->
-        <button type="button" disabled class="w-10 h-10 rounded-2xl bg-card border border-line flex items-center justify-center text-muted/50 shrink-0">
+        <button type="button" aria-label="Сканировать штрихкод" @click="scanning = true" class="w-10 h-10 rounded-2xl bg-card border border-line flex items-center justify-center text-ink shrink-0">
           <ScanLine :size="18" />
         </button>
       </div>
@@ -337,6 +364,7 @@ function titleFor(item: PickItem): string {
 
     <MealTargetSheet v-if="pickingTarget" :date="date" @close="pickingTarget = false" @pick="pickTarget" />
     <AddEntrySheet v-if="opening" :item="opening" :date="date" :target="target" @close="opening = null" @added="afterAdd" />
-    <FoodFormSheet v-if="creatingKind" :kind="creatingKind" @close="creatingKind = null" @saved="onFoodSaved" />
+    <FoodFormSheet v-if="creatingKind" :kind="creatingKind" :preset-barcode="presetBarcode" @close="closeCreating" @saved="onFoodSaved" />
+    <BarcodeScannerSheet v-if="scanning" @close="scanning = false" @detected="onBarcodeDetected" />
   </div>
 </template>

@@ -25,7 +25,7 @@ import { neon } from '@neondatabase/serverless'
 import { and, eq, lt, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { catalogProducts } from '../../db/catalogSchema.ts'
-import { buildSearchText } from '../../db/searchText.ts'
+import { buildSearchText, decodeEntities } from '../../db/searchText.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 config({ path: path.join(__dirname, '..', '..', '.env') })
@@ -75,16 +75,6 @@ const reader = await duck.runAndReadAll(`
 `)
 const raw = reader.getRowObjectsJS()
 console.log(`Товаров в наших странах с заполненными Б/Ж/У: ${raw.length} (${Math.round((Date.now() - t0) / 1000)} с)`)
-
-// В самих данных OFF кавычки бывают HTML-экранированы (~1 тыс. строк в
-// наших странах: «ООО &quot;Дейри Фуд&quot;») — раскодируем
-const ENTITIES = { quot: '"', amp: '&', apos: "'", lt: '<', gt: '>', nbsp: ' ' }
-function decodeEntities(s) {
-  return s
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/&([a-z]+);/gi, (m, name) => ENTITIES[name.toLowerCase()] ?? m)
-}
 
 const products = []
 const skipped = { noName: 0, badMacros: 0 }

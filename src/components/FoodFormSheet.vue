@@ -4,7 +4,7 @@
 // продукта из базы (`base` с catalogId, этап 2.6) — поля из каталога,
 // сохраняется как свой продукт со ссылкой sourceCatalogId, сам каталог не
 // меняется. Полноэкранная, а не шторка — полей слишком много для шторки.
-import { ArrowLeft } from '@lucide/vue'
+import { ArrowLeft, ScanLine } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import type { Food } from '../lib/db'
 import type { PickItem } from '../lib/pick'
@@ -17,8 +17,11 @@ import {
   softDeleteFood,
   updateFood,
 } from '../lib/foods'
+import BarcodeScannerSheet from './BarcodeScannerSheet.vue'
 
-const props = defineProps<{ kind: 'product' | 'dish'; food?: Food; base?: PickItem }>()
+// presetBarcode — форма открылась со штрихкодом, если сканер снаружи
+// (AddFoodView) ничего не нашёл ни в своих продуктах, ни в базе (README)
+const props = defineProps<{ kind: 'product' | 'dish'; food?: Food; base?: PickItem; presetBarcode?: string }>()
 const emit = defineEmits<{ close: []; saved: [foodId: string, addNow: boolean]; deleted: [] }>()
 
 const isEdit = computed(() => !!props.food)
@@ -29,7 +32,8 @@ const isVersion = computed(() => (props.food ? !!props.food.sourceCatalogId : !!
 const src = props.food ?? props.base
 const name = ref(src?.name ?? '')
 const brand = ref(src?.brand ?? '')
-const barcode = ref(src?.barcode ?? '')
+const barcode = ref(src?.barcode ?? props.presetBarcode ?? '')
+const scanningBarcode = ref(false)
 const note = ref(props.food?.note ?? '')
 // Хранится всегда на 100 г — при правке нет смысла угадывать, вводили ли
 // когда-то «на порцию», просто показываем уже пересчитанное.
@@ -105,6 +109,13 @@ async function remove() {
   await softDeleteFood(props.food.id)
   emit('deleted')
 }
+
+// Сканер здесь только заполняет поле — поиск по каталогу/OFF уже прошёл
+// снаружи, до открытия этой формы (README «Форма продукта»)
+function onBarcodeScanned(code: string) {
+  barcode.value = code
+  scanningBarcode.value = false
+}
 </script>
 
 <template>
@@ -141,8 +152,12 @@ async function remove() {
 
       <label v-if="kind === 'product'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Штрихкод</span>
-        <!-- Сканер — этап 3, пока только ручной ввод -->
-        <input v-model="barcode" type="text" inputmode="numeric" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+        <div class="flex gap-2">
+          <input v-model="barcode" type="text" inputmode="numeric" class="flex-1 rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <button type="button" aria-label="Сканировать штрихкод" @click="scanningBarcode = true" class="w-11 h-11 rounded-2xl bg-card border border-line flex items-center justify-center text-ink shrink-0">
+            <ScanLine :size="18" />
+          </button>
+        </div>
       </label>
 
       <div v-if="kind === 'product'" class="flex flex-col gap-1">
@@ -211,5 +226,7 @@ async function remove() {
         Сохранить и добавить
       </button>
     </div>
+
+    <BarcodeScannerSheet v-if="scanningBarcode" @close="scanningBarcode = false" @detected="onBarcodeScanned" />
   </div>
 </template>

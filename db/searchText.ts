@@ -34,3 +34,16 @@ export function buildSearchText(...parts: (string | null | undefined)[]): string
   }
   return [...seen].join(' | ')
 }
+
+/**
+ * Кавычки и другие символы в текстах Open Food Facts иногда HTML-
+ * экранированы («ООО &quot;Дейри Фуд&quot;») — и в дампе (import.mjs), и в
+ * живом запросе по штрихкоду (functions/api/catalog/barcode/[code].ts).
+ */
+const HTML_ENTITIES: Record<string, string> = { quot: '"', amp: '&', apos: "'", lt: '<', gt: '>', nbsp: ' ' }
+export function decodeEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-z]+);/gi, (m, name) => HTML_ENTITIES[name.toLowerCase()] ?? m)
+}

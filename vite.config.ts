@@ -60,6 +60,16 @@ export default defineConfig({
         // системный кэш при «Добавить на экран Домой» — нашему SW эти 22
         // файла не нужны, precache тащил бы их в офлайн-шелл зря.
         globIgnores: ['splash/**', 'icons/**'],
+        // .wasm сканера штрихкода (этап 3, ~1 МБ) — не в install-precache
+        // (не входит в globPatterns), а в runtime-кэш при первом сканировании:
+        // офлайн работает после первого раза, установка не тяжелеет.
+        runtimeCaching: [
+          {
+            urlPattern: /\.wasm$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'wasm-cache' },
+          },
+        ],
       },
     }),
   ],
