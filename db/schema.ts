@@ -152,7 +152,10 @@ export const dailyActiveEnergy = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     date: text('date').notNull(),
-    totalActiveKcal: real('total_active_kcal').notNull(),
+    // Команда шлёт активную энергию и энергию покоя отдельными запросами,
+    // поэтому до прихода второго запроса одно из полей может быть пустым.
+    totalActiveKcal: real('total_active_kcal'),
+    restingKcal: real('resting_kcal'),
     ...syncColumns,
   },
   (t) => [

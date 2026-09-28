@@ -284,6 +284,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
     dailyActiveEnergy: dailyActiveEnergyRows.map((r) => ({
       date: r.date,
       totalActiveKcal: r.totalActiveKcal,
+      restingKcal: r.restingKcal,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
       deletedAt: r.deletedAt?.toISOString() ?? null,

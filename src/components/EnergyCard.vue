@@ -48,11 +48,18 @@ function runShortcut() {
       </button>
     </div>
 
-    <!-- Этап 5, не из README до реализации: вся активная энергия за день
-         целиком, только для просмотра, отдельно от «Потрачено» выше (та
-         строка — про цель/энергию покоя, эта — сырое число из Здоровья) -->
+    <!-- Этап 5: сырые числа из Здоровья за день, только для просмотра —
+         отдельно от «Потрачено» выше (та строка — про цель и покой из
+         настроек). «Всего» — только когда пришли оба числа. -->
     <p v-if="dailyActiveEnergy" class="px-4 text-xs text-muted">
-      Активная энергия за день (Здоровье): {{ Math.round(dailyActiveEnergy.totalActiveKcal) }} ккал
+      Здоровье:
+      <template v-if="dailyActiveEnergy.totalActiveKcal !== null">активная {{ Math.round(dailyActiveEnergy.totalActiveKcal) }}</template>
+      <template v-if="dailyActiveEnergy.totalActiveKcal !== null && dailyActiveEnergy.restingKcal !== null"> · </template>
+      <template v-if="dailyActiveEnergy.restingKcal !== null">покой {{ Math.round(dailyActiveEnergy.restingKcal) }}</template>
+      <template v-if="dailyActiveEnergy.totalActiveKcal !== null && dailyActiveEnergy.restingKcal !== null">
+        · всего {{ Math.round(dailyActiveEnergy.totalActiveKcal + dailyActiveEnergy.restingKcal) }}
+      </template>
+      ккал
     </p>
 
     <button type="button" @click="expanded = !expanded" class="w-full flex items-center gap-3 px-4 py-2.5 text-left">

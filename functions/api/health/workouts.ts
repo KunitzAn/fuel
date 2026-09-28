@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
-import { activities, apiTokens, dailyActiveEnergy } from '../../../db/schema'
-import { hashApiToken } from '../../_lib/apiToken'
+import { activities, dailyActiveEnergy } from '../../../db/schema'
+import { authenticateApiToken } from '../../_lib/apiToken'
 import type { Db } from '../../_lib/db'
 import { getDb } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
@@ -19,21 +19,6 @@ interface WireWorkout {
 interface WireDailyActiveEnergy {
   date: string
   totalActiveKcal: number
-}
-
-async function authenticate(db: Db, request: Request): Promise<number | null> {
-  const header = request.headers.get('Authorization')
-  if (!header?.startsWith('Bearer ')) return null
-  const token = header.slice('Bearer '.length).trim()
-  if (!token) return null
-  const tokenHash = await hashApiToken(token)
-
-  const rows = await db.select({ id: apiTokens.id, userId: apiTokens.userId }).from(apiTokens).where(eq(apiTokens.tokenHash, tokenHash)).limit(1)
-  const row = rows[0]
-  if (!row) return null
-
-  await db.update(apiTokens).set({ lastUsedAt: sql`now()` }).where(eq(apiTokens.id, row.id))
-  return row.userId
 }
 
 async function upsertWorkouts(db: Db, userId: number, workouts: WireWorkout[]): Promise<{ count: number; kcal: number }> {
@@ -99,7 +84,7 @@ async function upsertDailyActiveEnergy(db: Db, userId: number, rows: WireDailyAc
  */
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const db = getDb(ctx.env)
-  const userId = await authenticate(db, ctx.request)
+  const userId = await authenticateApiToken(db, ctx.request)
   if (!userId) return error(401, 'unauthorized')
 
   const body = await readJson<{ workouts?: WireWorkout[]; dailyActiveEnergy?: WireDailyActiveEnergy[] }>(ctx.request)

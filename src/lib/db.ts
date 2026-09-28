@@ -147,7 +147,9 @@ export interface DayType {
  */
 export interface DailyActiveEnergy {
   date: string
-  totalActiveKcal: number
+  // Команда шлёт активную и покой отдельными запросами — одно из двух может ещё не прийти.
+  totalActiveKcal: number | null
+  restingKcal: number | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
