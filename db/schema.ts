@@ -101,10 +101,17 @@ export const snacks = pgTable(
 )
 
 /**
- * Ручная активность и (позже, этап 5) тренировки с Apple Watch — обе влияют
- * на «потрачено» и на цель дня (README «Цели и энергия»). `externalId`/
- * `startedAt`/`durationMin` пока не заполняются (source всегда 'manual') —
- * задел под этап 5, чтобы потом не делать вторую миграцию.
+ * Ручная активность и (этап 5) тренировки с Apple Watch через Команду iOS —
+ * обе влияют на «потрачено» и на цель дня (README «Цели и энергия»).
+ * `externalId`/`startedAt`/`durationMin` — только у `source: 'watch'`.
+ * `kcal` — активные калории тренировки, как и раньше, участвуют в цели.
+ * `totalKcal` — этап 5, не из README до реализации: мысль владелицы,
+ * дополнительно тянуть ещё и полные калории тренировки (активные + расход
+ * покоя за то же время), только для просмотра, в расчёт цели не входит.
+ * Уникальность по `(userId, externalId)` — апсерт одной и той же
+ * тренировки при повторной отправке (например, не долетел ответ) не
+ * создаёт дубль; у ручных активностей `externalId` всегда `null`, и
+ * несколько `null` друг с другом в Postgres не конфликтуют.
  */
 export const activities = pgTable(
   'activities',
@@ -117,13 +124,58 @@ export const activities = pgTable(
     source: text('source').notNull(), // 'watch' | 'manual'
     name: text('name'),
     kcal: real('kcal').notNull(),
+    totalKcal: real('total_kcal'),
     externalId: text('external_id'), // id тренировки из Здоровья (этап 5)
     startedAt: timestamp('started_at', { withTimezone: true }),
     durationMin: real('duration_min'),
     ...syncColumns,
   },
-  (t) => [index('activities_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
+  (t) => [
+    index('activities_user_sync_idx').on(t.userId, t.serverUpdatedAt),
+    uniqueIndex('activities_user_external_uidx').on(t.userId, t.externalId),
+  ],
 )
+
+/**
+ * Вся активная энергия за день целиком (этап 5, не из README до
+ * реализации) — не только внутри тренировок, мысль владелицы: «пока
+ * просто её где-то выведем для себя... мб в будущем пригодится». Только
+ * для просмотра, в цель/потрачено не участвует. Без синтетического id —
+ * как `day_types`, ключ строки сама дата, правится на месте (Команда
+ * присылает свежее число за день, не версия). Пишет только сервер
+ * (`/api/health/workouts`, Bearer-токен) — с клиента это read-only.
+ */
+export const dailyActiveEnergy = pgTable(
+  'daily_active_energy',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(),
+    totalActiveKcal: real('total_active_kcal').notNull(),
+    ...syncColumns,
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.date] }),
+    index('daily_active_energy_user_sync_idx').on(t.userId, t.serverUpdatedAt),
+  ],
+)
+
+/**
+ * Личный токен Команды iOS (этап 5) — хранится только хэш, как коды входа
+ * (`loginCodes`, `hashCode`). «Выпустить новый» удаляет старый — сырой
+ * токен виден один раз, в момент выпуска, дальше только «выпущен тогда-то».
+ * Один активный токен на пользователя, отдельной таблицы «истории» не надо.
+ */
+export const apiTokens = pgTable('api_tokens', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+})
 
 /**
  * Версии настроек целей — правка действует с сегодняшнего дня, прошлые дни

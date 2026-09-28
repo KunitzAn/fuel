@@ -16,6 +16,7 @@ export async function addActivity(date: string, draft: ActivityDraft): Promise<v
     source: 'manual',
     name: draft.name,
     kcal: draft.kcal,
+    totalKcal: null,
     externalId: null,
     startedAt: null,
     durationMin: null,

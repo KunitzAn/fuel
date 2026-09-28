@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // Карточка энергии (README «Главный экран»): потрачено, разница, список
-// активностей дня, ручное добавление. ⟳ (подтянуть тренировки с Watch) —
-// этап 5, пока не активна.
+// активностей дня, ручное добавление. ⟳ — запускает Команду iOS (этап 5),
+// подтягивает тренировки; сам pull делает общий триггер visibilitychange
+// (src/lib/sync.ts) при возврате в приложение, отдельно вызывать не нужно.
 import { ChevronDown, Flame, RefreshCw } from '@lucide/vue'
 import { computed, ref } from 'vue'
-import type { Activity } from '../lib/db'
+import type { Activity, DailyActiveEnergy } from '../lib/db'
 import type { DayGoal } from '../lib/goals'
 import ActivityFormSheet from './ActivityFormSheet.vue'
 
@@ -13,6 +14,10 @@ const props = defineProps<{
   activities: Activity[] // уже отфильтрованы по этому дню
   goal: DayGoal | null // null — цели ещё не настроены (README «без настроек»)
   eatenKcal: number
+  // Этап 5, не из README до реализации: вся активная энергия за день
+  // целиком (не только внутри тренировок), только для просмотра — мысль
+  // владелицы, «мб в будущем пригодится».
+  dailyActiveEnergy: DailyActiveEnergy | null
 }>()
 
 const expanded = ref(false)
@@ -24,6 +29,10 @@ const differenceLabel = computed(() => {
   const rounded = Math.round(difference.value)
   return rounded > 0 ? `+${rounded}` : String(rounded)
 })
+
+function runShortcut() {
+  window.location.href = 'shortcuts://run-shortcut?name=Fuel'
+}
 </script>
 
 <template>
@@ -34,11 +43,17 @@ const differenceLabel = computed(() => {
         Потрачено {{ Math.round(goal.spentKcal) }} · Разница {{ differenceLabel }}
       </h3>
       <h3 v-else class="text-sm text-ink flex-1">Активность</h3>
-      <!-- Команда iOS подтягивает тренировки — этап 5 -->
-      <button type="button" disabled aria-label="Подтянуть тренировки" class="w-7 h-7 rounded-full flex items-center justify-center text-muted/50 shrink-0">
+      <button type="button" @click="runShortcut" aria-label="Подтянуть тренировки" class="w-7 h-7 rounded-full flex items-center justify-center text-ink shrink-0">
         <RefreshCw :size="16" />
       </button>
     </div>
+
+    <!-- Этап 5, не из README до реализации: вся активная энергия за день
+         целиком, только для просмотра, отдельно от «Потрачено» выше (та
+         строка — про цель/энергию покоя, эта — сырое число из Здоровья) -->
+    <p v-if="dailyActiveEnergy" class="px-4 text-xs text-muted">
+      Активная энергия за день (Здоровье): {{ Math.round(dailyActiveEnergy.totalActiveKcal) }} ккал
+    </p>
 
     <button type="button" @click="expanded = !expanded" class="w-full flex items-center gap-3 px-4 py-2.5 text-left">
       <span class="text-xs text-muted flex-1">
@@ -59,7 +74,10 @@ const differenceLabel = computed(() => {
           class="flex items-center gap-3 px-4 py-2.5 border-t border-line first:border-t-0 active:bg-bg"
         >
           <span class="flex-1 text-sm text-ink truncate">{{ activity.name ?? 'Активность' }}</span>
-          <span class="text-xs text-muted shrink-0">{{ Math.round(activity.kcal) }} ккал</span>
+          <span class="text-xs text-muted shrink-0">
+            {{ Math.round(activity.kcal) }} ккал
+            <template v-if="activity.totalKcal !== null">· полных {{ Math.round(activity.totalKcal) }}</template>
+          </span>
         </li>
       </ul>
       <button type="button" @click="editingActivity = 'new'" class="w-full text-left px-4 py-2.5 text-sm text-accent border-t border-line">

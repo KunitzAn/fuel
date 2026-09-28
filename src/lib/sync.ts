@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { checkSession, me } from './auth'
 import { api } from './api'
-import { db, type Activity, type DayType, type Entry, type Food, type GoalSettings, type Snack } from './db'
+import { db, type Activity, type DailyActiveEnergy, type DayType, type Entry, type Food, type GoalSettings, type Snack } from './db'
 
 const LAST_SYNCED_AT_KEY = 'lastSyncedAt'
 const SYNCED_USER_ID_KEY = 'syncedUserId'
@@ -23,6 +23,9 @@ interface SyncResponse {
   activities: Omit<Activity, 'dirty'>[]
   goalSettings: Omit<GoalSettings, 'dirty'>[]
   dayTypes: Omit<DayType, 'dirty'>[]
+  // Этап 5, не из README до реализации: read-only с клиента, пишет только
+  // `/api/health/workouts` — своего push для этой таблицы нет.
+  dailyActiveEnergy: Omit<DailyActiveEnergy, 'dirty'>[]
 }
 
 interface PushResponse {
@@ -60,7 +63,7 @@ async function getSyncedUserId(): Promise<number | null> {
 async function resetLocalDiary(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.dayTypes, db.settings],
+    [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.dayTypes, db.dailyActiveEnergy, db.settings],
     async () => {
       await db.foods.clear()
       await db.snacks.clear()
@@ -68,6 +71,7 @@ async function resetLocalDiary(): Promise<void> {
       await db.activities.clear()
       await db.goalSettings.clear()
       await db.dayTypes.clear()
+      await db.dailyActiveEnergy.clear()
       await db.settings.delete(LAST_SYNCED_AT_KEY)
     },
   )
@@ -81,7 +85,7 @@ async function resetLocalDiary(): Promise<void> {
  * обычный мёрж по `updatedAt` подходит и для первого синка тоже.
  */
 async function mergePulled(res: SyncResponse): Promise<void> {
-  await db.transaction('rw', [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.dayTypes], async () => {
+  await db.transaction('rw', [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.dayTypes, db.dailyActiveEnergy], async () => {
     for (const f of res.foods) {
       const local = await db.foods.get(f.id)
       if (!local || new Date(local.updatedAt) < new Date(f.updatedAt)) {
@@ -116,6 +120,12 @@ async function mergePulled(res: SyncResponse): Promise<void> {
       const local = await db.dayTypes.get(d.date)
       if (!local || new Date(local.updatedAt) < new Date(d.updatedAt)) {
         await db.dayTypes.put({ ...d, dirty: false })
+      }
+    }
+    for (const r of res.dailyActiveEnergy) {
+      const local = await db.dailyActiveEnergy.get(r.date)
+      if (!local || new Date(local.updatedAt) < new Date(r.updatedAt)) {
+        await db.dailyActiveEnergy.put({ ...r, dirty: false })
       }
     }
   })
@@ -171,6 +181,7 @@ function chunkPush(
 }
 
 async function updatePendingCount(): Promise<void> {
+  // dailyActiveEnergy не в счёт: read-only с клиента, dirty у неё не бывает.
   const [foodsAll, snacksAll, entriesAll, activitiesAll, goalSettingsAll, dayTypesAll] = await Promise.all([
     db.foods.toArray(),
     db.snacks.toArray(),

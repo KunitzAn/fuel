@@ -1,5 +1,5 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
-import { activities, dayTypes, entries, foods, goalSettings, snacks } from '../../db/schema'
+import { activities, dailyActiveEnergy, dayTypes, entries, foods, goalSettings, snacks } from '../../db/schema'
 import type { AuthedData } from '../_lib/context'
 import { getDb, type Db } from '../_lib/db'
 import type { Env } from '../_lib/env'
@@ -40,6 +40,7 @@ interface WireActivity {
   source: 'watch' | 'manual'
   name: string | null
   kcal: number
+  totalKcal: number | null
   externalId: string | null
   startedAt: string | null
   durationMin: number | null
@@ -123,7 +124,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
   const since = new URL(ctx.request.url).searchParams.get('since')
   const sinceDate = since ? new Date(since) : null
 
-  const [foodRows, snackRows, entryRows, activityRows, goalSettingsRows, dayTypeRows] = await Promise.all([
+  const [foodRows, snackRows, entryRows, activityRows, goalSettingsRows, dayTypeRows, dailyActiveEnergyRows] = await Promise.all([
     db
       .select()
       .from(foods)
@@ -165,6 +166,14 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
         sinceDate
           ? and(eq(dayTypes.userId, userId), gt(dayTypes.serverUpdatedAt, sinceDate))
           : eq(dayTypes.userId, userId),
+      ),
+    db
+      .select()
+      .from(dailyActiveEnergy)
+      .where(
+        sinceDate
+          ? and(eq(dailyActiveEnergy.userId, userId), gt(dailyActiveEnergy.serverUpdatedAt, sinceDate))
+          : eq(dailyActiveEnergy.userId, userId),
       ),
   ])
 
@@ -221,6 +230,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       source: a.source,
       name: a.name,
       kcal: a.kcal,
+      totalKcal: a.totalKcal,
       externalId: a.externalId,
       startedAt: a.startedAt?.toISOString() ?? null,
       durationMin: a.durationMin,
@@ -267,6 +277,16 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       createdAt: d.createdAt.toISOString(),
       updatedAt: d.updatedAt.toISOString(),
       deletedAt: d.deletedAt?.toISOString() ?? null,
+    })),
+    // Этап 5, не из README до реализации: read-only с клиента, пишет
+    // только /api/health/workouts (Bearer-токен Команды) — своего push
+    // для этой таблицы здесь, в POST-хендлере ниже, нет и не будет.
+    dailyActiveEnergy: dailyActiveEnergyRows.map((r) => ({
+      date: r.date,
+      totalActiveKcal: r.totalActiveKcal,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+      deletedAt: r.deletedAt?.toISOString() ?? null,
     })),
   })
 }
@@ -478,6 +498,7 @@ async function upsertActivities(db: Db, userId: number, rows: WireActivity[]): P
         source: a.source,
         name: a.name,
         kcal: a.kcal,
+        totalKcal: a.totalKcal,
         externalId: a.externalId,
         startedAt: a.startedAt ? new Date(a.startedAt) : null,
         durationMin: a.durationMin,
@@ -494,6 +515,7 @@ async function upsertActivities(db: Db, userId: number, rows: WireActivity[]): P
         source: sql`excluded.source`,
         name: sql`excluded.name`,
         kcal: sql`excluded.kcal`,
+        totalKcal: sql`excluded.total_kcal`,
         externalId: sql`excluded.external_id`,
         startedAt: sql`excluded.started_at`,
         durationMin: sql`excluded.duration_min`,

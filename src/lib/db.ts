@@ -56,13 +56,20 @@ export interface Setting {
   value: string
 }
 
-/** Ручная активность и (этап 5) тренировки с Apple Watch — README «Цели и энергия». */
+/**
+ * Ручная активность и (этап 5) тренировки с Apple Watch — README «Цели и
+ * энергия». `kcal` — активные калории тренировки, участвуют в цели, как и
+ * раньше. `totalKcal` (этап 5, не из README до реализации) — полные
+ * калории тренировки (актив + расход покоя за то же время), только для
+ * просмотра, в расчёт не входит; у ручных активностей всегда `null`.
+ */
 export interface Activity {
   id: string
   date: string
   source: 'watch' | 'manual'
   name: string | null
   kcal: number
+  totalKcal: number | null
   externalId: string | null
   startedAt: string | null
   durationMin: number | null
@@ -133,6 +140,20 @@ export interface DayType {
   dirty: boolean
 }
 
+/**
+ * Вся активная энергия за день целиком (этап 5, не из README до
+ * реализации) — read-only с клиента, пишет только `/api/health/workouts`.
+ * Ключ — дата, без синтетического id, как `DayType`.
+ */
+export interface DailyActiveEnergy {
+  date: string
+  totalActiveKcal: number
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+  dirty: boolean
+}
+
 export const db = new Dexie('fuel') as Dexie & {
   foods: EntityTable<Food, 'id'>
   snacks: EntityTable<Snack, 'id'>
@@ -141,6 +162,7 @@ export const db = new Dexie('fuel') as Dexie & {
   activities: EntityTable<Activity, 'id'>
   goalSettings: EntityTable<GoalSettings, 'id'>
   dayTypes: EntityTable<DayType, 'date'>
+  dailyActiveEnergy: EntityTable<DailyActiveEnergy, 'date'>
 }
 
 db.version(1).stores({
@@ -161,4 +183,8 @@ db.version(2).stores({
 
 db.version(3).stores({
   dayTypes: 'date, dirty, deletedAt',
+})
+
+db.version(4).stores({
+  dailyActiveEnergy: 'date, dirty, deletedAt',
 })

@@ -38,12 +38,15 @@ const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === n
 const allSnacks = useLiveQuery(() => db.snacks.filter((s) => s.deletedAt === null).toArray(), [])
 const allActivities = useLiveQuery(() => db.activities.filter((a) => a.deletedAt === null).toArray(), [])
 const allGoalSettings = useLiveQuery(() => db.goalSettings.filter((g) => g.deletedAt === null).toArray(), [])
+// Этап 5, не из README до реализации: вся активная энергия за день целиком, только для просмотра.
+const allDailyActiveEnergy = useLiveQuery(() => db.dailyActiveEnergy.filter((r) => r.deletedAt === null).toArray(), [])
 const allDayTypes = useLiveQuery(() => db.dayTypes.filter((d) => d.deletedAt === null).toArray(), [])
 
 // Версия настроек этого конкретного дня — не «сегодня» (README «История
 // настроек целей»): прошлый день должен считаться по цифрам, которые были
 // действующими тогда, даже если настройки потом поменяли.
 const dayActivities = computed(() => allActivities.value.filter((a) => a.date === date.value))
+const dayDailyActiveEnergy = computed(() => allDailyActiveEnergy.value.find((r) => r.date === date.value) ?? null)
 const currentGoalSettings = computed(() => pickGoalSettingsForDate(allGoalSettings.value, date.value))
 const activityGoal = computed(() =>
   currentGoalSettings.value ? computeDayGoal(currentGoalSettings.value, sumActivityKcal(dayActivities.value)) : null,
@@ -260,7 +263,13 @@ onBeforeRouteLeave((to) => {
           :day-kcal="dayTotals.kcal"
         />
       </template>
-      <EnergyCard :date="date" :activities="dayActivities" :goal="dayGoal" :eaten-kcal="dayTotals.kcal" />
+      <EnergyCard
+        :date="date"
+        :activities="dayActivities"
+        :goal="dayGoal"
+        :eaten-kcal="dayTotals.kcal"
+        :daily-active-energy="dayDailyActiveEnergy"
+      />
     </div>
 
     <DayPickerSheet v-if="pickingDay" @close="pickingDay = false" @pick="pickDay" />

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// Токен Команды iOS — этап 5.
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { getTokenStatus, issueToken, type TokenStatus } from '../lib/apiTokens'
 import { checkSession, logout, me } from '../lib/auth'
-import { todayLocalDate } from '../lib/date'
+import { formatTime, todayLocalDate } from '../lib/date'
 import { db } from '../lib/db'
 import { saveGoalSettings } from '../lib/goalSettings'
 import { pickGoalSettingsForDate } from '../lib/goals'
@@ -29,9 +29,58 @@ onMounted(async () => {
     void runSync().finally(() => {
       goalsFormReady.value = true
     })
+    void getTokenStatus()
+      .then((s) => (tokenStatus.value = s))
+      .catch(() => {})
   } else {
     goalsFormReady.value = true
   }
+})
+
+/**
+ * Личный токен Команды iOS (этап 5, README «Синхронизация тренировок»).
+ * Сырое значение сервер отдаёт только в ответ на «Выпустить новый» — дальше
+ * храним только хэш, повторно показать нельзя, только «выпущен тогда-то».
+ */
+const tokenStatus = ref<TokenStatus | null>(null)
+const issuedToken = ref<string | null>(null)
+const issuingToken = ref(false)
+const tokenCopied = ref(false)
+
+async function handleIssueToken() {
+  issuingToken.value = true
+  issuedToken.value = null
+  tokenCopied.value = false
+  try {
+    const { token, createdAt } = await issueToken()
+    issuedToken.value = token
+    tokenStatus.value = { exists: true, createdAt }
+  } finally {
+    issuingToken.value = false
+  }
+}
+
+async function copyIssuedToken() {
+  if (!issuedToken.value) return
+  await navigator.clipboard.writeText(issuedToken.value)
+  tokenCopied.value = true
+  setTimeout(() => (tokenCopied.value = false), 2000)
+}
+
+// Статус «Последняя синхронизация: … · N тренировок · M ккал» (README) —
+// не отдельная сущность на сервере, а то, что уже видно по локальным
+// данным: тренировки с Watch за сегодня. Проще, чем городить лог синка
+// ради статусной строки в личном одиночном приложении.
+const todayWatchActivities = useLiveQuery(
+  () => db.activities.filter((a) => a.deletedAt === null && a.source === 'watch' && a.date === todayLocalDate()).toArray(),
+  [],
+)
+const watchSyncStatus = computed(() => {
+  const rows = todayWatchActivities.value
+  if (rows.length === 0) return null
+  const lastUpdatedAt = rows.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), rows[0]!.updatedAt)
+  const kcal = rows.reduce((sum, a) => sum + a.kcal, 0)
+  return { time: formatTime(lastUpdatedAt), count: rows.length, kcal: Math.round(kcal) }
 })
 
 // Офлайн-копия готова, когда страницей управляет service worker — он
@@ -535,6 +584,48 @@ async function saveGoals() {
       </p>
     </section>
 
-    <p class="mt-4 text-muted">Здесь будет синхронизация тренировок (этап 5).</p>
+    <section v-if="me" class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+      <h2 class="text-sm font-semibold text-ink">Тренировки из Команд iOS</h2>
+      <p class="text-xs text-muted">
+        Личный токен — вставляется один раз в Команду <code>Fuel</code> на телефоне, дальше Команда сама шлёт тренировки.
+      </p>
+
+      <template v-if="issuedToken">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-muted">Токен (виден только сейчас — скопируйте в Команду)</span>
+          <div class="flex items-center gap-2">
+            <code class="flex-1 rounded-2xl bg-bg border border-line px-3 py-2.5 text-xs text-ink break-all">{{ issuedToken }}</code>
+            <button type="button" @click="copyIssuedToken" class="rounded-2xl border border-line px-3 py-2.5 text-xs text-ink shrink-0">
+              {{ tokenCopied ? 'Скопировано' : 'Копировать' }}
+            </button>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <p class="text-xs text-muted">
+          {{ tokenStatus?.exists ? `Токен выпущен (${new Date(tokenStatus.createdAt!).toLocaleDateString('ru-RU')}), сохранён как хэш — повторно показать нельзя.` : 'Токен ещё не выпущен.' }}
+        </p>
+      </template>
+      <button
+        type="button"
+        :disabled="issuingToken"
+        @click="handleIssueToken"
+        class="rounded-2xl py-2.5 text-sm font-medium text-ink border border-line disabled:opacity-40"
+      >
+        {{ tokenStatus?.exists ? 'Выпустить новый (старый перестанет работать)' : 'Выпустить токен' }}
+      </button>
+
+      <p class="text-xs text-muted pt-2 border-t border-line">
+        <template v-if="watchSyncStatus">
+          Последняя синхронизация: сегодня {{ watchSyncStatus.time }} · {{ watchSyncStatus.count }}
+          {{ watchSyncStatus.count === 1 ? 'тренировка' : 'тренировки' }} · {{ watchSyncStatus.kcal }} ккал
+        </template>
+        <template v-else>Сегодня тренировок с Watch ещё не было.</template>
+      </p>
+      <p class="text-xs text-muted">
+        Инструкция по сборке Команды <code>Fuel</code> — собираем вместе на телефоне (PLAN.md, этап 5.2), Claude
+        готовую Команду сам собрать не может.
+      </p>
+    </section>
   </main>
 </template>
