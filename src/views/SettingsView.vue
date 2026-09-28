@@ -81,8 +81,12 @@ const maxCarbsInput = ref('')
 
 // Предзаполняем один раз, как только текущая версия действительно
 // загрузилась — дальше это черновик формы, синк его не переписывает.
-// null — поле не было заполнено, оставляем инпут пустым, а не «null» строкой.
-const toInput = (v: number | null) => (v !== null ? String(v) : '')
+// null или undefined (старая локальная копия строки, закешированная до
+// того, как в неё добавили новое поле миграцией — у неё этого поля в
+// Dexie физически нет, а не null) — оставляем инпут пустым, не строкой
+// «undefined» (владелица поймала это на мин/макс границах, 2026-09-28).
+// `== null` ловит оба случая, `!= null` — «поле реально задано».
+const toInput = (v: number | null | undefined) => (v == null ? '' : String(v))
 watch(
   currentGoalSettings,
   (s) => {
@@ -90,7 +94,7 @@ watch(
     baseProteinInput.value = toInput(s.baseProtein)
     baseFatInput.value = toInput(s.baseFat)
     baseCarbsInput.value = toInput(s.baseCarbs)
-    if (s.baseProtein !== null && s.baseFat !== null && s.baseCarbs !== null) {
+    if (s.baseProtein != null && s.baseFat != null && s.baseCarbs != null) {
       baseKcalInput.value = String(Math.round(kcalFromMacros(s.baseProtein, s.baseFat, s.baseCarbs)))
     }
     restingKcalInput.value = toInput(s.restingKcal)
@@ -111,17 +115,17 @@ watch(
     maxFatInput.value = toInput(s.maxFat)
     minCarbsInput.value = toInput(s.minCarbs)
     maxCarbsInput.value = toInput(s.maxCarbs)
-    goalsEnabled.value = s.baseProtein !== null
-    dayTypeEnabled.value = s.highDeltaProtein !== null || s.lowDeltaProtein !== null
+    goalsEnabled.value = s.baseProtein != null
+    dayTypeEnabled.value = s.highDeltaProtein != null || s.lowDeltaProtein != null
     boundsEnabled.value =
-      s.minKcal !== null ||
-      s.maxKcal !== null ||
-      s.minProtein !== null ||
-      s.maxProtein !== null ||
-      s.minFat !== null ||
-      s.maxFat !== null ||
-      s.minCarbs !== null ||
-      s.maxCarbs !== null
+      s.minKcal != null ||
+      s.maxKcal != null ||
+      s.minProtein != null ||
+      s.maxProtein != null ||
+      s.minFat != null ||
+      s.maxFat != null ||
+      s.minCarbs != null ||
+      s.maxCarbs != null
   },
   { once: true },
 )
