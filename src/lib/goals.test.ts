@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyDayTypeDelta,
+  computeDayBoundsStatus,
   computeDayGoal,
   energyDifference,
   hasBaseGoal,
   isDayTypeDeltaConfigured,
   manualDayTypeDelta,
+  nutrientBoundStatus,
   pickGoalSettingsForDate,
   statsDayTypeDelta,
   sumActivityKcal,
@@ -26,6 +28,14 @@ const settings: GoalInput = {
   lowDeltaProtein: 0,
   lowDeltaFat: 0,
   lowDeltaCarbs: 60,
+  minKcal: null,
+  maxKcal: null,
+  minProtein: null,
+  maxProtein: null,
+  minFat: null,
+  maxFat: null,
+  minCarbs: null,
+  maxCarbs: null,
 }
 
 /** Все настройки в этом файле заполнены — цель точно есть, разворачиваем null для краткости тестов. */
@@ -106,6 +116,14 @@ describe('computeDayGoal', () => {
       lowDeltaProtein: null,
       lowDeltaFat: null,
       lowDeltaCarbs: null,
+      minKcal: null,
+      maxKcal: null,
+      minProtein: null,
+      maxProtein: null,
+      minFat: null,
+      maxFat: null,
+      minCarbs: null,
+      maxCarbs: null,
     }
     expect(computeDayGoal(empty, 0)).toBeNull()
   })
@@ -260,5 +278,56 @@ describe('statsDayTypeDelta', () => {
     const dayTypeRows = [{ date: '2026-01-05', actual: 'high' as const }]
     const entries = [entry('2026-01-05', 260)]
     expect(statsDayTypeDelta('high', { baseProtein: null, baseFat: 60, baseCarbs: 150 }, entries, dayTypeRows, null, '2026-01-10')).toBeNull()
+  })
+})
+
+describe('nutrientBoundStatus', () => {
+  it('обе границы не заданы — null, подсвечивать нечего', () => {
+    expect(nutrientBoundStatus(100, null, null)).toBeNull()
+  })
+
+  it('ниже минимума — under', () => {
+    expect(nutrientBoundStatus(50, 80, null)).toBe('under')
+  })
+
+  it('ровно на минимуме — ok, не under', () => {
+    expect(nutrientBoundStatus(80, 80, null)).toBe('ok')
+  })
+
+  it('выше максимума — over', () => {
+    expect(nutrientBoundStatus(120, null, 100)).toBe('over')
+  })
+
+  it('ровно на максимуме — ok, не over', () => {
+    expect(nutrientBoundStatus(100, null, 100)).toBe('ok')
+  })
+
+  it('между минимумом и максимумом — ok', () => {
+    expect(nutrientBoundStatus(90, 80, 100)).toBe('ok')
+  })
+
+  it('задан только минимум, значение выше него — ok (верхней границы нет)', () => {
+    expect(nutrientBoundStatus(9999, 80, null)).toBe('ok')
+  })
+})
+
+describe('computeDayBoundsStatus', () => {
+  const bounds = {
+    minKcal: 1500,
+    maxKcal: 2200,
+    minProtein: 100,
+    maxProtein: null,
+    minFat: null,
+    maxFat: 80,
+    minCarbs: null,
+    maxCarbs: null,
+  }
+
+  it('считает независимо по каждому нутриенту, включая полностью незаданные', () => {
+    const status = computeDayBoundsStatus(bounds, { kcal: 1400, protein: 120, fat: 90, carbs: 300 })
+    expect(status.kcal).toBe('under') // ниже 1500
+    expect(status.protein).toBe('ok') // выше 100, верхней нет
+    expect(status.fat).toBe('over') // выше 80
+    expect(status.carbs).toBeNull() // границ по У вообще нет
   })
 })

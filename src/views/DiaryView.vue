@@ -12,7 +12,14 @@ import { capitalizeFirst, formatDateWithWeekday, todayLocalDate, weekDates } fro
 import { setActualDayType, setPlannedDayType, type DayTypePlan } from '../lib/dayTypes'
 import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } from '../lib/diary'
 import { db } from '../lib/db'
-import { applyDayTypeDelta, computeDayGoal, pickGoalSettingsForDate, sumActivityKcal, type DayTypeKind } from '../lib/goals'
+import {
+  applyDayTypeDelta,
+  computeDayBoundsStatus,
+  computeDayGoal,
+  pickGoalSettingsForDate,
+  sumActivityKcal,
+  type DayTypeKind,
+} from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
@@ -78,6 +85,21 @@ const dayEntries = computed(() => allEntries.value.filter((e) => e.date === date
 const dayTotals = computed(() =>
   sumMacros(dayEntries.value.map((e) => scaleByGrams(e, e.grams))),
 )
+
+// Мин/макс границы (этап 4.5, не из README) — своя фича, не зависит от
+// activityGoal/dayGoal (владелица: «можно использовать и с целями, и без
+// них»), поэтому берём currentGoalSettings напрямую, а не готовую цель дня.
+const dayBoundsStatus = computed(() =>
+  currentGoalSettings.value ? computeDayBoundsStatus(currentGoalSettings.value, dayTotals.value) : null,
+)
+const boundsTextClass: Record<'under' | 'over' | 'ok', string> = {
+  under: 'text-amber-600',
+  over: 'text-red-500',
+  ok: 'text-ink',
+}
+function boundsClass(status: 'under' | 'over' | 'ok' | null | undefined): string {
+  return status ? boundsTextClass[status] : 'text-ink'
+}
 
 const mealEntries = computed(() => ({
   breakfast: dayEntries.value.filter((e) => e.meal === 'breakfast'),
@@ -203,25 +225,25 @@ onBeforeRouteLeave((to) => {
     <div class="rounded-2xl bg-card border border-line px-4 py-3 grid grid-cols-4 text-center">
       <div>
         <p class="text-[11px] text-muted">Б</p>
-        <p class="text-sm font-semibold text-ink">
+        <p class="text-sm font-semibold" :class="boundsClass(dayBoundsStatus?.protein)">
           {{ dayTotals.protein.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.protein) }}<span v-if="dayGoal.proteinChanged">⚡</span></template>
         </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">Ж</p>
-        <p class="text-sm font-semibold text-ink">
+        <p class="text-sm font-semibold" :class="boundsClass(dayBoundsStatus?.fat)">
           {{ dayTotals.fat.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.fat) }}<span v-if="dayGoal.fatChanged">⚡</span></template>
         </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">У</p>
-        <p class="text-sm font-semibold text-ink">
+        <p class="text-sm font-semibold" :class="boundsClass(dayBoundsStatus?.carbs)">
           {{ dayTotals.carbs.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.carbs) }}<span v-if="dayGoal.carbsChanged">⚡</span></template>
         </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">Ккал</p>
-        <p class="text-sm font-semibold text-ink">
+        <p class="text-sm font-semibold" :class="boundsClass(dayBoundsStatus?.kcal)">
           {{ Math.round(dayTotals.kcal) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.kcal) }}</template>
         </p>
       </div>

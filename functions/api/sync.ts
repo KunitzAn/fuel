@@ -64,6 +64,14 @@ interface WireGoalSettings {
   lowDeltaProtein: number
   lowDeltaFat: number
   lowDeltaCarbs: number
+  minKcal: number | null
+  maxKcal: number | null
+  minProtein: number | null
+  maxProtein: number | null
+  minFat: number | null
+  maxFat: number | null
+  minCarbs: number | null
+  maxCarbs: number | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -236,6 +244,14 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       lowDeltaProtein: g.lowDeltaProtein,
       lowDeltaFat: g.lowDeltaFat,
       lowDeltaCarbs: g.lowDeltaCarbs,
+      minKcal: g.minKcal,
+      maxKcal: g.maxKcal,
+      minProtein: g.minProtein,
+      maxProtein: g.maxProtein,
+      minFat: g.minFat,
+      maxFat: g.maxFat,
+      minCarbs: g.minCarbs,
+      maxCarbs: g.maxCarbs,
       createdAt: g.createdAt.toISOString(),
       updatedAt: g.updatedAt.toISOString(),
       deletedAt: g.deletedAt?.toISOString() ?? null,
@@ -513,6 +529,14 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         lowDeltaProtein: g.lowDeltaProtein,
         lowDeltaFat: g.lowDeltaFat,
         lowDeltaCarbs: g.lowDeltaCarbs,
+        minKcal: g.minKcal,
+        maxKcal: g.maxKcal,
+        minProtein: g.minProtein,
+        maxProtein: g.maxProtein,
+        minFat: g.minFat,
+        maxFat: g.maxFat,
+        minCarbs: g.minCarbs,
+        maxCarbs: g.maxCarbs,
         createdAt: new Date(g.createdAt),
         updatedAt: new Date(g.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -536,6 +560,14 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         lowDeltaProtein: sql`excluded.low_delta_protein`,
         lowDeltaFat: sql`excluded.low_delta_fat`,
         lowDeltaCarbs: sql`excluded.low_delta_carbs`,
+        minKcal: sql`excluded.min_kcal`,
+        maxKcal: sql`excluded.max_kcal`,
+        minProtein: sql`excluded.min_protein`,
+        maxProtein: sql`excluded.max_protein`,
+        minFat: sql`excluded.min_fat`,
+        maxFat: sql`excluded.max_fat`,
+        minCarbs: sql`excluded.min_carbs`,
+        maxCarbs: sql`excluded.max_carbs`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,

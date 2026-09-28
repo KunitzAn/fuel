@@ -67,6 +67,17 @@ const highDeltaCarbsInput = ref('')
 const lowDeltaProteinInput = ref('')
 const lowDeltaFatInput = ref('')
 const lowDeltaCarbsInput = ref('')
+// Мин/макс границы (этап 4.5) — отдельная фича от цели, своя пара границ
+// на все дни. Каждое из восьми полей независимо от остальных (не триада
+// Б/Ж/У, как у цели/типа дня — группировкой resolveGroup не нужна)
+const minKcalInput = ref('')
+const maxKcalInput = ref('')
+const minProteinInput = ref('')
+const maxProteinInput = ref('')
+const minFatInput = ref('')
+const maxFatInput = ref('')
+const minCarbsInput = ref('')
+const maxCarbsInput = ref('')
 
 // Предзаполняем один раз, как только текущая версия действительно
 // загрузилась — дальше это черновик формы, синк его не переписывает.
@@ -92,6 +103,14 @@ watch(
     lowDeltaProteinInput.value = toInput(s.lowDeltaProtein)
     lowDeltaFatInput.value = toInput(s.lowDeltaFat)
     lowDeltaCarbsInput.value = toInput(s.lowDeltaCarbs)
+    minKcalInput.value = toInput(s.minKcal)
+    maxKcalInput.value = toInput(s.maxKcal)
+    minProteinInput.value = toInput(s.minProtein)
+    maxProteinInput.value = toInput(s.maxProtein)
+    minFatInput.value = toInput(s.minFat)
+    maxFatInput.value = toInput(s.maxFat)
+    minCarbsInput.value = toInput(s.minCarbs)
+    maxCarbsInput.value = toInput(s.maxCarbs)
   },
   { once: true },
 )
@@ -182,6 +201,14 @@ async function saveGoals() {
     lowDeltaProtein,
     lowDeltaFat,
     lowDeltaCarbs,
+    minKcal: parseDecimal(minKcalInput.value),
+    maxKcal: parseDecimal(maxKcalInput.value),
+    minProtein: parseDecimal(minProteinInput.value),
+    maxProtein: parseDecimal(maxProteinInput.value),
+    minFat: parseDecimal(minFatInput.value),
+    maxFat: parseDecimal(maxFatInput.value),
+    minCarbs: parseDecimal(minCarbsInput.value),
+    maxCarbs: parseDecimal(maxCarbsInput.value),
   })
   goalsSavedJustNow.value = true
   setTimeout(() => (goalsSavedJustNow.value = false), 2000)
@@ -344,6 +371,49 @@ async function saveGoals() {
         пустые в ней сохранятся нулями; не тронули ни одного — вся группа так и останется не настроенной, не мешая
         другим. Прошлые дни, где что-то уже было настроено, в статистике не меняются.
       </p>
+
+      <div class="flex flex-col gap-3 pt-2 border-t border-line">
+        <h3 class="text-sm font-semibold text-ink">Мин/макс границы</h3>
+        <p class="text-xs text-muted">
+          Своя фича, отдельная от цели — можно использовать и вместе с целью, и без неё. Подсветка в дневнике по ходу
+          дня, если факт ещё не добрал до минимума или уже перебрал максимум. Каждая граница независима: можно задать
+          только одну из восьми и не трогать остальные.
+        </p>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ккал, мин</span>
+            <input v-model="minKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ккал, макс</span>
+            <input v-model="maxKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Белки, мин</span>
+            <input v-model="minProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Белки, макс</span>
+            <input v-model="maxProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Жиры, мин</span>
+            <input v-model="minFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Жиры, макс</span>
+            <input v-model="maxFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Углеводы, мин</span>
+            <input v-model="minCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Углеводы, макс</span>
+            <input v-model="maxCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+        </div>
+      </div>
 
       <p v-if="!goalsFormReady" class="text-xs text-muted">Подтягиваю то, что уже настроено…</p>
       <button

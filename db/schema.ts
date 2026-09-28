@@ -162,6 +162,20 @@ export const goalSettings = pgTable(
     lowDeltaProtein: real('low_delta_protein'),
     lowDeltaFat: real('low_delta_fat'),
     lowDeltaCarbs: real('low_delta_carbs'),
+    // Мин/макс границы нутриентов (этап 4.5, не из README — новая мысль
+    // владелицы). Отдельная от базовой цели фича: свои значения, не
+    // выводятся из базы. Одна пара границ на все дни (не различаются по
+    // типу дня, в отличие от highDelta/lowDelta выше) — так решила
+    // владелица. Каждая граница независима от остальных семи: можно
+    // задать нижнюю по белку и не задавать по остальным (src/lib/goals.ts).
+    minKcal: real('min_kcal'),
+    maxKcal: real('max_kcal'),
+    minProtein: real('min_protein'),
+    maxProtein: real('max_protein'),
+    minFat: real('min_fat'),
+    maxFat: real('max_fat'),
+    minCarbs: real('min_carbs'),
+    maxCarbs: real('max_carbs'),
     ...syncColumns,
   },
   (t) => [index('goal_settings_user_sync_idx').on(t.userId, t.serverUpdatedAt)],

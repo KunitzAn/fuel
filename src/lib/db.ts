@@ -78,7 +78,10 @@ export interface Activity {
  * день просто не показывается — только факт. `high/lowDelta*` — поправка
  * для типа дня (этап 4.4, не из README) — та же версия, что и база; чтобы
  * этот тип дня был доступен на выбор, нужны все три его поля разом
- * (src/lib/goals.ts → isDayTypeDeltaConfigured).
+ * (src/lib/goals.ts → isDayTypeDeltaConfigured). `min/max*` — мин/макс
+ * границы нутриентов (этап 4.5, не из README) — своя фича, не выводится
+ * из базы, одна пара границ на все дни (без разбивки по типу дня), каждая
+ * из восьми независима от остальных (src/lib/goals.ts → configuredBounds).
  */
 export interface GoalSettings {
   id: string
@@ -96,6 +99,14 @@ export interface GoalSettings {
   lowDeltaProtein: number | null
   lowDeltaFat: number | null
   lowDeltaCarbs: number | null
+  minKcal: number | null
+  maxKcal: number | null
+  minProtein: number | null
+  maxProtein: number | null
+  minFat: number | null
+  maxFat: number | null
+  minCarbs: number | null
+  maxCarbs: number | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null

@@ -29,6 +29,14 @@ export interface GoalInput {
   lowDeltaProtein: number | null
   lowDeltaFat: number | null
   lowDeltaCarbs: number | null
+  minKcal: number | null
+  maxKcal: number | null
+  minProtein: number | null
+  maxProtein: number | null
+  minFat: number | null
+  maxFat: number | null
+  minCarbs: number | null
+  maxCarbs: number | null
 }
 
 export interface DayGoal {
@@ -206,4 +214,41 @@ export function applyDayTypeDelta(goal: DayGoal, delta: DayTypeDelta | null): Da
   const fat = goal.fat + delta.fat
   const carbs = goal.carbs + delta.carbs
   return { ...goal, protein, fat, carbs, kcal: kcalFromMacros(protein, fat, carbs) }
+}
+
+/**
+ * Мин/макс границы нутриентов (этап 4.5, не из README — новая мысль
+ * владелицы). Отдельная фича от цели (4.1–4.3) и от поправки на тип дня
+ * (4.4) — свои значения, одна пара границ на все дни (владелица: «границы
+ * можно использовать как вместе с целями, так и отдельно от целей»).
+ * Каждый из четырёх нутриентов независим от остальных — можно задать
+ * только нижнюю по белку и ничего больше.
+ */
+export type BoundStatus = 'under' | 'over' | 'ok'
+
+/** `null` — граница вообще не задана (ни низ, ни верх) для этого нутриента, подсвечивать нечего. */
+export function nutrientBoundStatus(eaten: number, min: number | null, max: number | null): BoundStatus | null {
+  if (min === null && max === null) return null
+  if (min !== null && eaten < min) return 'under'
+  if (max !== null && eaten > max) return 'over'
+  return 'ok'
+}
+
+export interface DayBoundsStatus {
+  kcal: BoundStatus | null
+  protein: BoundStatus | null
+  fat: BoundStatus | null
+  carbs: BoundStatus | null
+}
+
+export function computeDayBoundsStatus(
+  settings: Pick<GoalInput, 'minKcal' | 'maxKcal' | 'minProtein' | 'maxProtein' | 'minFat' | 'maxFat' | 'minCarbs' | 'maxCarbs'>,
+  eaten: { kcal: number; protein: number; fat: number; carbs: number },
+): DayBoundsStatus {
+  return {
+    kcal: nutrientBoundStatus(eaten.kcal, settings.minKcal, settings.maxKcal),
+    protein: nutrientBoundStatus(eaten.protein, settings.minProtein, settings.maxProtein),
+    fat: nutrientBoundStatus(eaten.fat, settings.minFat, settings.maxFat),
+    carbs: nutrientBoundStatus(eaten.carbs, settings.minCarbs, settings.maxCarbs),
+  }
 }
