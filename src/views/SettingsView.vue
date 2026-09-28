@@ -111,6 +111,17 @@ watch(
     maxFatInput.value = toInput(s.maxFat)
     minCarbsInput.value = toInput(s.minCarbs)
     maxCarbsInput.value = toInput(s.maxCarbs)
+    goalsEnabled.value = s.baseProtein !== null
+    dayTypeEnabled.value = s.highDeltaProtein !== null || s.lowDeltaProtein !== null
+    boundsEnabled.value =
+      s.minKcal !== null ||
+      s.maxKcal !== null ||
+      s.minProtein !== null ||
+      s.maxProtein !== null ||
+      s.minFat !== null ||
+      s.maxFat !== null ||
+      s.minCarbs !== null ||
+      s.maxCarbs !== null
   },
   { once: true },
 )
@@ -152,6 +163,65 @@ function resolveGroup(inputs: string[]): (number | null)[] {
   const parsed = inputs.map(parseDecimal)
   if (parsed.every((v) => v === null)) return parsed
   return parsed.map((v) => v ?? 0)
+}
+
+/**
+ * Этап 4.6 (не из README, мысль владелицы): экран настроек был плоским
+ * списком полей, непонятно, что можно включать/выключать по отдельности.
+ * Три блока — «Цель», «Тип дня», «Мин/макс границы» — каждый со своим
+ * чекбоксом. Чекбокс тут не отдельный флаг в БД (это по-прежнему просто
+ * «заполнены поля или нет», как и раньше, см. `hasBaseGoal` и
+ * `isDayTypeDeltaConfigured`/`computeDayBoundsStatus` в lib/goals.ts) —
+ * это явное действие «включить/выключить» поверх той же механики:
+ * включён = поля этого блока видны и участвуют в сохранении, выключен —
+ * поля скрыты и очищены В ЧЕРНОВИКЕ формы (ничего не пишется в БД, пока
+ * не нажата «Сохранить»); список галочек сразу показывает, какой набор
+ * настроек вообще есть, вместо того чтобы гадать по списку полей.
+ */
+const goalsEnabled = ref(false)
+const dayTypeEnabled = ref(false)
+const boundsEnabled = ref(false)
+
+function checkboxValue(e: Event): boolean {
+  return (e.target as HTMLInputElement).checked
+}
+
+function toggleGoals(e: Event) {
+  goalsEnabled.value = checkboxValue(e)
+  if (!goalsEnabled.value) {
+    baseProteinInput.value = ''
+    baseFatInput.value = ''
+    baseCarbsInput.value = ''
+    baseKcalInput.value = ''
+    restingKcalInput.value = ''
+    perHundredProteinInput.value = ''
+    perHundredFatInput.value = ''
+    perHundredCarbsInput.value = ''
+  }
+}
+function toggleDayType(e: Event) {
+  dayTypeEnabled.value = checkboxValue(e)
+  if (!dayTypeEnabled.value) {
+    highDeltaProteinInput.value = ''
+    highDeltaFatInput.value = ''
+    highDeltaCarbsInput.value = ''
+    lowDeltaProteinInput.value = ''
+    lowDeltaFatInput.value = ''
+    lowDeltaCarbsInput.value = ''
+  }
+}
+function toggleBounds(e: Event) {
+  boundsEnabled.value = checkboxValue(e)
+  if (!boundsEnabled.value) {
+    minKcalInput.value = ''
+    maxKcalInput.value = ''
+    minProteinInput.value = ''
+    maxProteinInput.value = ''
+    minFatInput.value = ''
+    maxFatInput.value = ''
+    minCarbsInput.value = ''
+    maxCarbsInput.value = ''
+  }
 }
 
 const kcalError = ref<string | null>(null)
@@ -262,123 +332,151 @@ async function saveGoals() {
       </p>
     </section>
 
-    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-4">
-      <h2 class="text-sm font-semibold text-ink">Цели</h2>
-
-      <div class="flex flex-col gap-1">
-        <span class="text-xs text-muted">Цель по умолчанию (день без активности)</span>
-        <div class="grid grid-cols-3 gap-2">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Белки, г</span>
-            <input v-model="baseProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Жиры, г</span>
-            <input v-model="baseFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Углеводы, г</span>
-            <input v-model="baseCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-        </div>
-        <div class="flex items-end gap-2">
-          <label class="flex-1 flex flex-col gap-1">
-            <span class="text-xs text-muted">Ккал</span>
-            <input
-              v-model="baseKcalInput"
-              type="text"
-              inputmode="decimal"
-              placeholder="Подставится из БЖУ"
-              class="rounded-2xl bg-bg border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
-            />
-          </label>
-          <button type="button" @click="fillBaseKcalFromMacros" class="rounded-2xl border border-line px-3 py-2.5 text-xs text-ink shrink-0">
-            = из БЖУ
-          </button>
-        </div>
-        <p v-if="kcalError" class="text-xs text-red-500">{{ kcalError }}</p>
-        <p v-else class="text-xs text-muted">
-          {{ baseKcalFromMacros !== null ? 'Подставляется само, пока не начала печатать своё' : 'Необязательно — совсем не заполнено, цели дня не будет' }}
-        </p>
-      </div>
-
-      <label class="flex flex-col gap-1">
-        <span class="text-xs text-muted">Энергия покоя, ккал</span>
-        <input v-model="restingKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+    <!-- Этап 4.6 (не из README) — три независимых блока с чекбоксом на
+         каждый, вместо одного плоского списка полей. Включение/выключение
+         здесь — черновик формы, ничего не пишется в БД, пока не нажата
+         «Сохранить» внизу; прошлые дни/версии эта правка не трогает
+         (та же версионируемая история, что и раньше, см. 4.1). -->
+    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+      <label class="flex items-start gap-2">
+        <input type="checkbox" :checked="goalsEnabled" @change="toggleGoals" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
+        <span>
+          <span class="block text-sm font-semibold text-ink">Цель</span>
+          <span class="block text-xs text-muted">Дневная норма Б/Ж/У и энергии покоя, растёт от активности.</span>
+        </span>
       </label>
 
-      <div class="flex flex-col gap-1">
-        <span class="text-xs text-muted">На каждые 100 ккал активности — прибавка к цели</span>
-        <div class="grid grid-cols-3 gap-2">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Б, г</span>
-            <input v-model="perHundredProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Ж, г</span>
-            <input v-model="perHundredFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">У, г</span>
-            <input v-model="perHundredCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
+      <template v-if="goalsEnabled">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-muted">Цель по умолчанию (день без активности)</span>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Белки, г</span>
+              <input v-model="baseProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Жиры, г</span>
+              <input v-model="baseFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Углеводы, г</span>
+              <input v-model="baseCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+          </div>
+          <div class="flex items-end gap-2">
+            <label class="flex-1 flex flex-col gap-1">
+              <span class="text-xs text-muted">Ккал</span>
+              <input
+                v-model="baseKcalInput"
+                type="text"
+                inputmode="decimal"
+                placeholder="Подставится из БЖУ"
+                class="rounded-2xl bg-bg border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+              />
+            </label>
+            <button type="button" @click="fillBaseKcalFromMacros" class="rounded-2xl border border-line px-3 py-2.5 text-xs text-ink shrink-0">
+              = из БЖУ
+            </button>
+          </div>
+          <p v-if="kcalError" class="text-xs text-red-500">{{ kcalError }}</p>
+          <p v-else class="text-xs text-muted">
+            {{ baseKcalFromMacros !== null ? 'Подставляется само, пока не начала печатать своё' : 'Необязательно — совсем не заполнено, цели дня не будет' }}
+          </p>
         </div>
-        <p class="text-xs text-muted">≈ {{ Math.round(perHundredKcalHint) }} ккал — подсказка, не входит в расчёт</p>
-      </div>
 
-      <p class="text-xs text-muted">
-        Прибавка от активности только положительная — цель не опускается ниже дефолтной. Изменение действует с сегодняшнего дня, прошлые дни остаются со своими цифрами.
-      </p>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs text-muted">Энергия покоя, ккал</span>
+          <input v-model="restingKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+        </label>
 
-      <div class="flex flex-col gap-1 pt-2 border-t border-line">
-        <span class="text-xs text-muted">Высокоуглеводный день — прибавка к цели (вручную)</span>
-        <div class="grid grid-cols-3 gap-2">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Б, г</span>
-            <input v-model="highDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Ж, г</span>
-            <input v-model="highDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">У, г</span>
-            <input v-model="highDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-muted">На каждые 100 ккал активности — прибавка к цели</span>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Б, г</span>
+              <input v-model="perHundredProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Ж, г</span>
+              <input v-model="perHundredFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">У, г</span>
+              <input v-model="perHundredCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+          </div>
+          <p class="text-xs text-muted">≈ {{ Math.round(perHundredKcalHint) }} ккал — подсказка, не входит в расчёт</p>
         </div>
-      </div>
 
-      <div class="flex flex-col gap-1">
-        <span class="text-xs text-muted">Низкоуглеводный день — убавка от цели (вручную, вводить положительным числом)</span>
-        <div class="grid grid-cols-3 gap-2">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Б, г</span>
-            <input v-model="lowDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Ж, г</span>
-            <input v-model="lowDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">У, г</span>
-            <input v-model="lowDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-        </div>
-      </div>
-      <p class="text-xs text-muted">
-        При простановке типа дня можно будет выбрать: эти числа или среднее по факту прошлых дней такого же типа.
-        Всё здесь необязательно. Тронули хоть одно поле в группе (базовая цель, high, low — по отдельности) — остальные
-        пустые в ней сохранятся нулями; не тронули ни одного — вся группа так и останется не настроенной, не мешая
-        другим. Прошлые дни, где что-то уже было настроено, в статистике не меняются.
-      </p>
-
-      <div class="flex flex-col gap-3 pt-2 border-t border-line">
-        <h3 class="text-sm font-semibold text-ink">Мин/макс границы</h3>
         <p class="text-xs text-muted">
-          Своя фича, отдельная от цели — можно использовать и вместе с целью, и без неё. Подсветка в дневнике по ходу
-          дня, если факт ещё не добрал до минимума или уже перебрал максимум. Каждая граница независима: можно задать
-          только одну из восьми и не трогать остальные.
+          Прибавка от активности только положительная — цель не опускается ниже дефолтной. Изменение действует с сегодняшнего дня, прошлые дни остаются со своими цифрами.
         </p>
+      </template>
+    </section>
+
+    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+      <label class="flex items-start gap-2">
+        <input type="checkbox" :checked="dayTypeEnabled" @change="toggleDayType" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
+        <span>
+          <span class="block text-sm font-semibold text-ink">Высоко-/низкоуглеводные дни</span>
+          <span class="block text-xs text-muted">Поправка к цели на день, отмеченный высоко- или низкоуглеводным (план с утра, факт в конце дня — на странице дня).</span>
+        </span>
+      </label>
+
+      <template v-if="dayTypeEnabled">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-muted">Высокоуглеводный день — прибавка к цели (вручную)</span>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Б, г</span>
+              <input v-model="highDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Ж, г</span>
+              <input v-model="highDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">У, г</span>
+              <input v-model="highDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-muted">Низкоуглеводный день — убавка от цели (вручную, вводить положительным числом)</span>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Б, г</span>
+              <input v-model="lowDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Ж, г</span>
+              <input v-model="lowDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">У, г</span>
+              <input v-model="lowDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+          </div>
+        </div>
+        <p class="text-xs text-muted">
+          При простановке типа дня можно будет выбрать: эти числа или среднее по факту прошлых дней такого же типа.
+          Высокоуглеводный и низкоуглеводный настраиваются по отдельности — можно задать только один из двух. Тронули
+          хоть одно поле своей тройки — остальные пустые в ней сохранятся нулями.
+        </p>
+      </template>
+    </section>
+
+    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+      <label class="flex items-start gap-2">
+        <input type="checkbox" :checked="boundsEnabled" @change="toggleBounds" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
+        <span>
+          <span class="block text-sm font-semibold text-ink">Мин/макс границы</span>
+          <span class="block text-xs text-muted">Подсветка на странице дня, если факт ещё не добрал до минимума или уже перебрал максимум — отдельно от цели, можно использовать и вместе с ней, и без неё.</span>
+        </span>
+      </label>
+
+      <template v-if="boundsEnabled">
         <div class="grid grid-cols-2 gap-2">
           <label class="flex flex-col gap-1">
             <span class="text-xs text-muted">Ккал, мин</span>
@@ -413,8 +511,11 @@ async function saveGoals() {
             <input v-model="maxCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
           </label>
         </div>
-      </div>
+        <p class="text-xs text-muted">Каждая граница независима — можно задать только одну из восьми и не трогать остальные.</p>
+      </template>
+    </section>
 
+    <section class="mt-3 flex flex-col gap-2">
       <p v-if="!goalsFormReady" class="text-xs text-muted">Подтягиваю то, что уже настроено…</p>
       <button
         type="button"
@@ -424,6 +525,10 @@ async function saveGoals() {
       >
         {{ goalsSavedJustNow ? 'Сохранено' : 'Сохранить' }}
       </button>
+      <p class="text-xs text-muted">
+        Выключенный чекбокс выше — только черновик формы, ничего не стирается, пока не нажата «Сохранить». Прошлые
+        дни и версии настроек, где что-то уже было настроено, в статистике не меняются.
+      </p>
     </section>
 
     <p class="mt-4 text-muted">Здесь будет синхронизация тренировок (этап 5).</p>
