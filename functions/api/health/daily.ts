@@ -5,11 +5,19 @@ import { getDb } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
 import { error, json, readJson } from '../../_lib/http'
 
-// Команда с русской локалью может прислать число строкой с запятой («1152,136»).
+// Команда с русской локалью может прислать число строкой с запятой и
+// единицами («1 152,136 kcal») — берём первое число из строки.
 function parseKcal(v: unknown): number | null | 'invalid' {
   if (v === undefined || v === null || v === '') return null
-  const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.').replace(/\s/g, ''))
-  return Number.isFinite(n) && n >= 0 ? n : 'invalid'
+  if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : 'invalid'
+  const match = String(v).replace(/\s/g, '').replace(',', '.').match(/\d+(\.\d+)?/)
+  return match ? Number(match[0]) : 'invalid'
+}
+
+// «2026-09-27» или «2026-09-27T13:55:00+03:00» — берём дату в начале строки.
+function parseDate(v: unknown): string | null {
+  const match = typeof v === 'string' ? v.trim().match(/^\d{4}-\d{2}-\d{2}/) : null
+  return match ? match[0] : null
 }
 
 /**
@@ -27,13 +35,16 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   if (!userId) return error(401, 'unauthorized')
 
   const body = await readJson<{ date?: unknown; activeKcal?: unknown; restingKcal?: unknown }>(ctx.request)
-  if (!body || typeof body.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
-    return error(400, 'invalid_date')
-  }
+  // В ответе на ошибку — то, что реально пришло: в Командах иначе не
+  // увидеть, во что превратилась переменная (формат даты, единицы и т.п.).
+  const fail = (reason: string) => json({ error: reason, received: body }, { status: 400 })
+  if (!body) return error(400, 'invalid_body')
+  const date = parseDate(body.date)
+  if (!date) return fail('invalid_date')
   const activeKcal = parseKcal(body.activeKcal)
   const restingKcal = parseKcal(body.restingKcal)
-  if (activeKcal === 'invalid' || restingKcal === 'invalid') return error(400, 'invalid_kcal')
-  if (activeKcal === null && restingKcal === null) return error(400, 'nothing_to_save')
+  if (activeKcal === 'invalid' || restingKcal === 'invalid') return fail('invalid_kcal')
+  if (activeKcal === null && restingKcal === null) return fail('nothing_to_save')
 
   const set: Record<string, unknown> = { updatedAt: sql`now()`, serverUpdatedAt: sql`now()`, deletedAt: null }
   if (activeKcal !== null) set.totalActiveKcal = activeKcal
@@ -41,12 +52,12 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 
   await db
     .insert(dailyActiveEnergy)
-    .values({ userId, date: body.date, totalActiveKcal: activeKcal, restingKcal, serverUpdatedAt: sql`now()` })
+    .values({ userId, date, totalActiveKcal: activeKcal, restingKcal, serverUpdatedAt: sql`now()` })
     .onConflictDoUpdate({
       target: [dailyActiveEnergy.userId, dailyActiveEnergy.date],
       set,
       setWhere: eq(dailyActiveEnergy.userId, userId),
     })
 
-  return json({ ok: true, date: body.date, activeKcal, restingKcal })
+  return json({ ok: true, date, activeKcal, restingKcal })
 }
