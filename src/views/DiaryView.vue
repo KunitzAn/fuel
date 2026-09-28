@@ -269,6 +269,7 @@ onBeforeRouteLeave((to) => {
         :goal="dayGoal"
         :eaten-kcal="dayTotals.kcal"
         :daily-active-energy="dayDailyActiveEnergy"
+        :health-connected="allDailyActiveEnergy.length > 0"
       />
     </div>
 

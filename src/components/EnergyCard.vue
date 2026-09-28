@@ -5,6 +5,7 @@
 // (src/lib/sync.ts) при возврате в приложение, отдельно вызывать не нужно.
 import { ChevronDown, Flame, RefreshCw } from '@lucide/vue'
 import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { Activity, DailyActiveEnergy } from '../lib/db'
 import type { DayGoal } from '../lib/goals'
 import ActivityFormSheet from './ActivityFormSheet.vue'
@@ -18,6 +19,9 @@ const props = defineProps<{
   // сложена с ручными в `goal` (goals.ts → dayActivityKcal), здесь — только
   // показать её строкой в списке. Покой — только для просмотра.
   dailyActiveEnergy: DailyActiveEnergy | null
+  // Из Здоровья не пришло ни одного дня — скорее всего, Команда не
+  // настроена. Подсказка, чтобы не ждали, что активность придёт сама.
+  healthConnected: boolean
 }>()
 
 const healthActiveKcal = computed(() => props.dailyActiveEnergy?.totalActiveKcal ?? null)
@@ -59,6 +63,12 @@ function runShortcut() {
       </span>
       <ChevronDown :size="16" class="text-muted transition-transform" :class="expanded ? 'rotate-180' : ''" />
     </button>
+
+    <p v-if="!healthConnected" class="px-4 pb-2.5 -mt-1 text-xs text-muted">
+      Активность из Здоровья приходит только через Команду iOS —
+      <RouterLink to="/settings" class="text-accent underline underline-offset-2">как подключить</RouterLink>.
+      Без неё добавляйте вручную.
+    </p>
 
     <template v-if="expanded">
       <ul class="border-t border-line">

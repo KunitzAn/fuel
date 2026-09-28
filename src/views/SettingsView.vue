@@ -67,20 +67,15 @@ async function copyIssuedToken() {
   setTimeout(() => (tokenCopied.value = false), 2000)
 }
 
-// Статус «Последняя синхронизация: … · N тренировок · M ккал» (README) —
-// не отдельная сущность на сервере, а то, что уже видно по локальным
-// данным: тренировки с Watch за сегодня. Проще, чем городить лог синка
-// ради статусной строки в личном одиночном приложении.
-const todayWatchActivities = useLiveQuery(
-  () => db.activities.filter((a) => a.deletedAt === null && a.source === 'watch' && a.date === todayLocalDate()).toArray(),
-  [],
-)
-const watchSyncStatus = computed(() => {
-  const rows = todayWatchActivities.value
+// Статус Команды — по локальным данным из Здоровья: когда последний раз
+// что-то пришло (отдельного лога синка на сервере нет и не нужно).
+const healthRows = useLiveQuery(() => db.dailyActiveEnergy.filter((r) => r.deletedAt === null).toArray(), [])
+const healthSyncStatus = computed(() => {
+  const rows = healthRows.value
   if (rows.length === 0) return null
-  const lastUpdatedAt = rows.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), rows[0]!.updatedAt)
-  const kcal = rows.reduce((sum, a) => sum + a.kcal, 0)
-  return { time: formatTime(lastUpdatedAt), count: rows.length, kcal: Math.round(kcal) }
+  const last = rows.reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), rows[0]!.updatedAt)
+  const lastDate = new Date(last).toDateString() === new Date().toDateString() ? 'сегодня' : new Date(last).toLocaleDateString('ru-RU')
+  return `${lastDate} в ${formatTime(last)}`
 })
 
 // Офлайн-копия готова, когда страницей управляет service worker — он
@@ -585,9 +580,11 @@ async function saveGoals() {
     </section>
 
     <section v-if="me" class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
-      <h2 class="text-sm font-semibold text-ink">Тренировки из Команд iOS</h2>
+      <h2 class="text-sm font-semibold text-ink">Активность из Здоровья (iPhone)</h2>
       <p class="text-xs text-muted">
-        Личный токен — вставляется один раз в Команду <code>Fuel</code> на телефоне, дальше Команда сама шлёт тренировки.
+        Сама по себе активность не подтягивается: сайты не видят приложение Здоровье, это ограничение Apple. Данные
+        приходят только через Команду <code>Fuel</code> в приложении «Команды» — ей нужен личный токен ниже. Без
+        неё активность можно добавлять вручную на странице дня («+ активность»).
       </p>
 
       <template v-if="issuedToken">
@@ -616,15 +613,8 @@ async function saveGoals() {
       </button>
 
       <p class="text-xs text-muted pt-2 border-t border-line">
-        <template v-if="watchSyncStatus">
-          Последняя синхронизация: сегодня {{ watchSyncStatus.time }} · {{ watchSyncStatus.count }}
-          {{ watchSyncStatus.count === 1 ? 'тренировка' : 'тренировки' }} · {{ watchSyncStatus.kcal }} ккал
-        </template>
-        <template v-else>Сегодня тренировок с Watch ещё не было.</template>
-      </p>
-      <p class="text-xs text-muted">
-        Инструкция по сборке Команды <code>Fuel</code> — собираем вместе на телефоне (PLAN.md, этап 5.2), Claude
-        готовую Команду сам собрать не может.
+        <template v-if="healthSyncStatus">Последние данные из Здоровья: {{ healthSyncStatus }}.</template>
+        <template v-else>Данных из Здоровья ещё не было — Команда не настроена или ни разу не запускалась.</template>
       </p>
     </section>
   </main>
