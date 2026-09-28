@@ -14,11 +14,13 @@ const props = defineProps<{
   activities: Activity[] // уже отфильтрованы по этому дню
   goal: DayGoal | null // null — цели ещё не настроены (README «без настроек»)
   eatenKcal: number
-  // Этап 5, не из README до реализации: вся активная энергия за день
-  // целиком (не только внутри тренировок), только для просмотра — мысль
-  // владелицы, «мб в будущем пригодится».
+  // Этап 5: энергия за день из Здоровья (Команда iOS). Активная уже
+  // сложена с ручными в `goal` (goals.ts → dayActivityKcal), здесь — только
+  // показать её строкой в списке. Покой — только для просмотра.
   dailyActiveEnergy: DailyActiveEnergy | null
 }>()
+
+const healthActiveKcal = computed(() => props.dailyActiveEnergy?.totalActiveKcal ?? null)
 
 const expanded = ref(false)
 const editingActivity = ref<Activity | 'new' | null>(null)
@@ -48,30 +50,26 @@ function runShortcut() {
       </button>
     </div>
 
-    <!-- Этап 5: сырые числа из Здоровья за день, только для просмотра —
-         отдельно от «Потрачено» выше (та строка — про цель и покой из
-         настроек). «Всего» — только когда пришли оба числа. -->
-    <p v-if="dailyActiveEnergy" class="px-4 text-xs text-muted">
-      Здоровье:
-      <template v-if="dailyActiveEnergy.totalActiveKcal !== null">активная {{ Math.round(dailyActiveEnergy.totalActiveKcal) }}</template>
-      <template v-if="dailyActiveEnergy.totalActiveKcal !== null && dailyActiveEnergy.restingKcal !== null"> · </template>
-      <template v-if="dailyActiveEnergy.restingKcal !== null">покой {{ Math.round(dailyActiveEnergy.restingKcal) }}</template>
-      <template v-if="dailyActiveEnergy.totalActiveKcal !== null && dailyActiveEnergy.restingKcal !== null">
-        · всего {{ Math.round(dailyActiveEnergy.totalActiveKcal + dailyActiveEnergy.restingKcal) }}
-      </template>
-      ккал
-    </p>
-
     <button type="button" @click="expanded = !expanded" class="w-full flex items-center gap-3 px-4 py-2.5 text-left">
       <span class="text-xs text-muted flex-1">
         <template v-if="activities.length">{{ activities.length }} {{ activities.length === 1 ? 'активность' : 'активности' }}</template>
-        <template v-else>Активностей нет</template>
+        <template v-if="activities.length && healthActiveKcal !== null"> · </template>
+        <template v-if="healthActiveKcal !== null">Здоровье {{ Math.round(healthActiveKcal) }} ккал</template>
+        <template v-if="!activities.length && healthActiveKcal === null">Активностей нет</template>
       </span>
       <ChevronDown :size="16" class="text-muted transition-transform" :class="expanded ? 'rotate-180' : ''" />
     </button>
 
     <template v-if="expanded">
       <ul class="border-t border-line">
+        <!-- Приходит из Команды iOS, в приложении не правится — без тапа -->
+        <li v-if="healthActiveKcal !== null" class="flex items-center gap-3 px-4 py-2.5">
+          <span class="flex-1 text-sm text-ink truncate">Активная энергия (Здоровье)</span>
+          <span class="text-xs text-muted shrink-0">
+            {{ Math.round(healthActiveKcal) }} ккал
+            <template v-if="dailyActiveEnergy?.restingKcal != null">· покой {{ Math.round(dailyActiveEnergy.restingKcal) }}</template>
+          </span>
+        </li>
         <li
           v-for="activity in activities"
           :key="activity.id"

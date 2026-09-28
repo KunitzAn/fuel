@@ -3,6 +3,7 @@ import {
   applyDayTypeDelta,
   computeDayBoundsStatus,
   computeDayGoal,
+  dayActivityKcal,
   energyDifference,
   hasBaseGoal,
   isDayTypeDeltaConfigured,
@@ -144,6 +145,23 @@ describe('sumActivityKcal', () => {
   })
   it('без активностей — 0', () => {
     expect(sumActivityKcal([])).toBe(0)
+  })
+})
+
+describe('dayActivityKcal', () => {
+  it('ручные + активная энергия из Здоровья складываются', () => {
+    expect(dayActivityKcal([{ kcal: 300 }], { totalActiveKcal: 1152 })).toBe(1452)
+  })
+  it('нет данных из Здоровья — только ручные', () => {
+    expect(dayActivityKcal([{ kcal: 300 }], null)).toBe(300)
+  })
+  it('строка из Здоровья есть, но активная ещё не пришла (только покой) — не ломает счёт', () => {
+    expect(dayActivityKcal([], { totalActiveKcal: null })).toBe(0)
+  })
+  it('поднимает цель через «на 100 ккал» так же, как ручная активность', () => {
+    const g = goal(settings, dayActivityKcal([], { totalActiveKcal: 500 }))
+    expect(g.carbs).toBe(150 + 90) // 500/100 × 18
+    expect(g.spentKcal).toBe(1450 + 500)
   })
 })
 

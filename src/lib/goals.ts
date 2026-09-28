@@ -5,7 +5,7 @@
  * не глядя на экран каждый раз.
  */
 import { shiftDate } from './date'
-import type { Activity, DayType, Entry, GoalSettings } from './db'
+import type { Activity, DailyActiveEnergy, DayType, Entry, GoalSettings } from './db'
 import { kcalFromMacros, scaleByGrams, sumMacros, type Macros } from './nutrition'
 
 /**
@@ -96,6 +96,19 @@ export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGo
 
 export function sumActivityKcal(activities: Pick<Activity, 'kcal'>[]): number {
   return activities.reduce((sum, a) => sum + a.kcal, 0)
+}
+
+/**
+ * Активность дня для цели и «потрачено» = ручные активности + активная
+ * энергия за день из Здоровья (Команда iOS, этап 5.2). Владелица решила
+ * складывать всё, даже если тренировка есть и там, и там — риск двойного
+ * счёта на её стороне. Нет данных из Здоровья — только ручные.
+ */
+export function dayActivityKcal(
+  activities: Pick<Activity, 'kcal'>[],
+  health: Pick<DailyActiveEnergy, 'totalActiveKcal'> | null,
+): number {
+  return sumActivityKcal(activities) + (health?.totalActiveKcal ?? 0)
 }
 
 /** README: «разница = съедено − потрачено» — минус означает дефицит. */
