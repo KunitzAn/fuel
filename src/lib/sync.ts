@@ -5,6 +5,17 @@ import { db, type Activity, type DailyActiveEnergy, type DayType, type Entry, ty
 
 const LAST_SYNCED_AT_KEY = 'lastSyncedAt'
 const SYNCED_USER_ID_KEY = 'syncedUserId'
+const SYNC_SCHEMA_KEY = 'syncSchema'
+/**
+ * Поднимать при каждом новом синкаемом поле или таблице. Старая версия
+ * приложения выбрасывает незнакомое из ответа сервера, но курсор `since`
+ * всё равно двигает — и новая версия потом никогда не получит строки,
+ * пришедшие до её установки. Так на телефоне владелицы мин/макс границы
+ * пришли как `undefined` (строка настроек закешировалась до миграции).
+ * Смена номера = один полный pull с заменой всех строк, которые локально
+ * не правились (`dirty: false`).
+ */
+const SYNC_SCHEMA = 2
 // Сервер апсертит одним запросом на таблицу — в лимит Cloudflare по
 // сабзапросам (см. functions/api/sync.ts) больше не упираемся. Резать на
 // части всё равно стоит: одна VALUES-пачка в тысячи строк (многодневный
@@ -84,47 +95,61 @@ async function resetLocalDiary(): Promise<void> {
  * Fuel никого не сеет — пользователь начинает с пустого дневника, поэтому
  * обычный мёрж по `updatedAt` подходит и для первого синка тоже.
  */
-async function mergePulled(res: SyncResponse): Promise<void> {
+/**
+ * Обычно берём серверную строку, только если она новее локальной. При
+ * полном обновлении — ещё и равную по времени, если локально её не
+ * правили: у неё те же данные, но в локальной копии может не хватать
+ * полей, добавленных позже.
+ */
+function shouldTake(local: { updatedAt: string; dirty: boolean } | undefined, remote: { updatedAt: string }, fullRefresh: boolean): boolean {
+  if (!local) return true
+  const localTime = new Date(local.updatedAt).getTime()
+  const remoteTime = new Date(remote.updatedAt).getTime()
+  if (localTime < remoteTime) return true
+  return fullRefresh && !local.dirty && localTime === remoteTime
+}
+
+async function mergePulled(res: SyncResponse, fullRefresh: boolean): Promise<void> {
   await db.transaction('rw', [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.dayTypes, db.dailyActiveEnergy], async () => {
     for (const f of res.foods) {
       const local = await db.foods.get(f.id)
-      if (!local || new Date(local.updatedAt) < new Date(f.updatedAt)) {
+      if (shouldTake(local, f, fullRefresh)) {
         await db.foods.put({ ...f, dirty: false })
       }
     }
     for (const s of res.snacks) {
       const local = await db.snacks.get(s.id)
-      if (!local || new Date(local.updatedAt) < new Date(s.updatedAt)) {
+      if (shouldTake(local, s, fullRefresh)) {
         await db.snacks.put({ ...s, dirty: false })
       }
     }
     for (const e of res.entries) {
       const local = await db.entries.get(e.id)
-      if (!local || new Date(local.updatedAt) < new Date(e.updatedAt)) {
+      if (shouldTake(local, e, fullRefresh)) {
         await db.entries.put({ ...e, dirty: false })
       }
     }
     for (const a of res.activities) {
       const local = await db.activities.get(a.id)
-      if (!local || new Date(local.updatedAt) < new Date(a.updatedAt)) {
+      if (shouldTake(local, a, fullRefresh)) {
         await db.activities.put({ ...a, dirty: false })
       }
     }
     for (const g of res.goalSettings) {
       const local = await db.goalSettings.get(g.id)
-      if (!local || new Date(local.updatedAt) < new Date(g.updatedAt)) {
+      if (shouldTake(local, g, fullRefresh)) {
         await db.goalSettings.put({ ...g, dirty: false })
       }
     }
     for (const d of res.dayTypes) {
       const local = await db.dayTypes.get(d.date)
-      if (!local || new Date(local.updatedAt) < new Date(d.updatedAt)) {
+      if (shouldTake(local, d, fullRefresh)) {
         await db.dayTypes.put({ ...d, dirty: false })
       }
     }
     for (const r of res.dailyActiveEnergy) {
       const local = await db.dailyActiveEnergy.get(r.date)
-      if (!local || new Date(local.updatedAt) < new Date(r.updatedAt)) {
+      if (shouldTake(local, r, fullRefresh)) {
         await db.dailyActiveEnergy.put({ ...r, dirty: false })
       }
     }
@@ -244,9 +269,12 @@ async function runSyncOnce(): Promise<void> {
       await db.settings.delete(LAST_SYNCED_AT_KEY)
     }
 
+    const fullRefresh = (await db.settings.get(SYNC_SCHEMA_KEY))?.value !== String(SYNC_SCHEMA)
+    if (fullRefresh) await db.settings.delete(LAST_SYNCED_AT_KEY)
+
     const since = await getLastSyncedAt()
     const pulled = await api.get<SyncResponse>(`/api/sync${since ? `?since=${encodeURIComponent(since)}` : ''}`)
-    await mergePulled(pulled)
+    await mergePulled(pulled, fullRefresh)
 
     const dirtyFoods = (await db.foods.toArray()).filter((f) => f.dirty)
     const dirtySnacks = (await db.snacks.toArray()).filter((s) => s.dirty)
@@ -292,6 +320,7 @@ async function runSyncOnce(): Promise<void> {
 
     await setLastSyncedAt(latestServerTime)
     await db.settings.put({ key: SYNCED_USER_ID_KEY, value: String(session.userId) })
+    await db.settings.put({ key: SYNC_SCHEMA_KEY, value: String(SYNC_SCHEMA) })
   } catch (err) {
     lastSyncError.value = err instanceof Error ? err.message : 'sync_failed'
   } finally {
