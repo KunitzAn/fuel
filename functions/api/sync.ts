@@ -73,6 +73,7 @@ interface WireGoalSettings {
   maxFat: number | null
   minCarbs: number | null
   maxCarbs: number | null
+  maxFollowsActivity?: boolean // нет у старых клиентов — считаем false
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -262,6 +263,7 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       maxFat: g.maxFat,
       minCarbs: g.minCarbs,
       maxCarbs: g.maxCarbs,
+      maxFollowsActivity: g.maxFollowsActivity,
       createdAt: g.createdAt.toISOString(),
       updatedAt: g.updatedAt.toISOString(),
       deletedAt: g.deletedAt?.toISOString() ?? null,
@@ -560,6 +562,7 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         maxFat: g.maxFat,
         minCarbs: g.minCarbs,
         maxCarbs: g.maxCarbs,
+        maxFollowsActivity: g.maxFollowsActivity ?? false,
         createdAt: new Date(g.createdAt),
         updatedAt: new Date(g.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -591,6 +594,7 @@ async function upsertGoalSettings(db: Db, userId: number, rows: WireGoalSettings
         maxFat: sql`excluded.max_fat`,
         minCarbs: sql`excluded.min_carbs`,
         maxCarbs: sql`excluded.max_carbs`,
+        maxFollowsActivity: sql`excluded.max_follows_activity`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,

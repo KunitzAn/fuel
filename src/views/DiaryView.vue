@@ -48,8 +48,9 @@ const allDayTypes = useLiveQuery(() => db.dayTypes.filter((d) => d.deletedAt ===
 const dayActivities = computed(() => allActivities.value.filter((a) => a.date === date.value))
 const dayDailyActiveEnergy = computed(() => allDailyActiveEnergy.value.find((r) => r.date === date.value) ?? null)
 const currentGoalSettings = computed(() => pickGoalSettingsForDate(allGoalSettings.value, date.value))
+const dayActivity = computed(() => dayActivityKcal(dayActivities.value, dayDailyActiveEnergy.value))
 const activityGoal = computed(() =>
-  currentGoalSettings.value ? computeDayGoal(currentGoalSettings.value, dayActivityKcal(dayActivities.value, dayDailyActiveEnergy.value)) : null,
+  currentGoalSettings.value ? computeDayGoal(currentGoalSettings.value, dayActivity.value) : null,
 )
 
 // Тип дня (этап 4.4, не из README): план — снимок поправки на момент
@@ -92,8 +93,9 @@ const dayTotals = computed(() =>
 // Мин/макс границы (этап 4.5, не из README) — своя фича, не зависит от
 // activityGoal/dayGoal (владелица: «можно использовать и с целями, и без
 // них»), поэтому берём currentGoalSettings напрямую, а не готовую цель дня.
+// Активность — только если включено «верхняя граница растёт с активностью».
 const dayBoundsStatus = computed(() =>
-  currentGoalSettings.value ? computeDayBoundsStatus(currentGoalSettings.value, dayTotals.value) : null,
+  currentGoalSettings.value ? computeDayBoundsStatus(currentGoalSettings.value, dayTotals.value, dayActivity.value) : null,
 )
 const boundsTextClass: Record<'under' | 'over' | 'ok', string> = {
   under: 'text-amber-600',

@@ -1,0 +1,1 @@
+ALTER TABLE "goal_settings" ADD COLUMN "max_follows_activity" boolean DEFAULT false NOT NULL;

@@ -37,6 +37,7 @@ export interface GoalInput {
   maxFat: number | null
   minCarbs: number | null
   maxCarbs: number | null
+  maxFollowsActivity: boolean
 }
 
 export interface DayGoal {
@@ -254,14 +255,53 @@ export interface DayBoundsStatus {
   carbs: BoundStatus | null
 }
 
-export function computeDayBoundsStatus(
-  settings: Pick<GoalInput, 'minKcal' | 'maxKcal' | 'minProtein' | 'maxProtein' | 'minFat' | 'maxFat' | 'minCarbs' | 'maxCarbs'>,
-  eaten: { kcal: number; protein: number; fat: number; carbs: number },
-): DayBoundsStatus {
+type BoundsInput = Pick<
+  GoalInput,
+  | 'minKcal'
+  | 'maxKcal'
+  | 'minProtein'
+  | 'maxProtein'
+  | 'minFat'
+  | 'maxFat'
+  | 'minCarbs'
+  | 'maxCarbs'
+  | 'maxFollowsActivity'
+  | 'perHundredProtein'
+  | 'perHundredFat'
+  | 'perHundredCarbs'
+>
+
+/**
+ * Чекбокс «Верхняя граница растёт с активностью» (владелица, после 5.2):
+ * макс ккал + вся активность дня, макс Б/Ж/У + то же «на 100 ккал», что и
+ * у цели (не задано — этот макс не двигается). Нижние границы и
+ * незаданные верхние не трогаем. Выключено — границы как вписаны.
+ */
+export function effectiveMaxBounds(
+  settings: BoundsInput,
+  activityKcal: number,
+): Pick<GoalInput, 'maxKcal' | 'maxProtein' | 'maxFat' | 'maxCarbs'> {
+  const activity = settings.maxFollowsActivity ? Math.max(0, activityKcal) : 0
+  const grow = (max: number | null, perHundred: number | null) =>
+    max == null ? null : max + (activity / 100) * (perHundred ?? 0)
   return {
-    kcal: nutrientBoundStatus(eaten.kcal, settings.minKcal, settings.maxKcal),
-    protein: nutrientBoundStatus(eaten.protein, settings.minProtein, settings.maxProtein),
-    fat: nutrientBoundStatus(eaten.fat, settings.minFat, settings.maxFat),
-    carbs: nutrientBoundStatus(eaten.carbs, settings.minCarbs, settings.maxCarbs),
+    maxKcal: settings.maxKcal == null ? null : settings.maxKcal + activity,
+    maxProtein: grow(settings.maxProtein, settings.perHundredProtein),
+    maxFat: grow(settings.maxFat, settings.perHundredFat),
+    maxCarbs: grow(settings.maxCarbs, settings.perHundredCarbs),
+  }
+}
+
+export function computeDayBoundsStatus(
+  settings: BoundsInput,
+  eaten: { kcal: number; protein: number; fat: number; carbs: number },
+  activityKcal: number,
+): DayBoundsStatus {
+  const max = effectiveMaxBounds(settings, activityKcal)
+  return {
+    kcal: nutrientBoundStatus(eaten.kcal, settings.minKcal, max.maxKcal),
+    protein: nutrientBoundStatus(eaten.protein, settings.minProtein, max.maxProtein),
+    fat: nutrientBoundStatus(eaten.fat, settings.minFat, max.maxFat),
+    carbs: nutrientBoundStatus(eaten.carbs, settings.minCarbs, max.maxCarbs),
   }
 }

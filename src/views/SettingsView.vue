@@ -122,6 +122,7 @@ const minFatInput = ref('')
 const maxFatInput = ref('')
 const minCarbsInput = ref('')
 const maxCarbsInput = ref('')
+const maxFollowsActivity = ref(false)
 
 // Предзаполняем один раз, как только текущая версия действительно
 // загрузилась — дальше это черновик формы, синк его не переписывает.
@@ -159,6 +160,7 @@ watch(
     maxFatInput.value = toInput(s.maxFat)
     minCarbsInput.value = toInput(s.minCarbs)
     maxCarbsInput.value = toInput(s.maxCarbs)
+    maxFollowsActivity.value = s.maxFollowsActivity === true
     goalsEnabled.value = s.baseProtein != null
     dayTypeEnabled.value = s.highDeltaProtein != null || s.lowDeltaProtein != null
     boundsEnabled.value =
@@ -269,6 +271,7 @@ function toggleBounds(e: Event) {
     maxFatInput.value = ''
     minCarbsInput.value = ''
     maxCarbsInput.value = ''
+    maxFollowsActivity.value = false
   }
 }
 
@@ -327,6 +330,7 @@ async function saveGoals() {
     maxFat: parseDecimal(maxFatInput.value),
     minCarbs: parseDecimal(minCarbsInput.value),
     maxCarbs: parseDecimal(maxCarbsInput.value),
+    maxFollowsActivity: maxFollowsActivity.value,
   })
   goalsSavedJustNow.value = true
   setTimeout(() => (goalsSavedJustNow.value = false), 2000)
@@ -560,6 +564,17 @@ async function saveGoals() {
           </label>
         </div>
         <p class="text-xs text-muted">Каждая граница независима — можно задать только одну из восьми и не трогать остальные.</p>
+        <label class="flex items-start gap-2">
+          <input v-model="maxFollowsActivity" type="checkbox" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
+          <span>
+            <span class="block text-sm text-ink">Верхние границы растут с активностью</span>
+            <span class="block text-xs text-muted">
+              Потратили за день 500 ккал на активность — макс по калориям вырастет на 500. Макс по Б/Ж/У вырастет так
+              же, как цель: по «на каждые 100 ккал активности» из блока «Цель» (если там не задано — не двигается).
+              Минимумы не меняются.
+            </span>
+          </span>
+        </label>
       </template>
     </section>
 

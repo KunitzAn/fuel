@@ -1,4 +1,4 @@
-import { index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -139,8 +139,9 @@ export const activities = pgTable(
 /**
  * Вся активная энергия за день целиком (этап 5, не из README до
  * реализации) — не только внутри тренировок, мысль владелицы: «пока
- * просто её где-то выведем для себя... мб в будущем пригодится». Только
- * для просмотра, в цель/потрачено не участвует. Без синтетического id —
+ * просто её где-то выведем для себя... мб в будущем пригодится». Активная
+ * энергия складывается с ручными активностями в цель и «потрачено»
+ * (src/lib/goals.ts → dayActivityKcal), покой — только для просмотра. Без синтетического id —
  * как `day_types`, ключ строки сама дата, правится на месте (Команда
  * присылает свежее число за день, не версия). Пишет только сервер
  * (`/api/health/workouts`, Bearer-токен) — с клиента это read-only.
@@ -231,6 +232,10 @@ export const goalSettings = pgTable(
     maxFat: real('max_fat'),
     minCarbs: real('min_carbs'),
     maxCarbs: real('max_carbs'),
+    // Верхние границы растут с активностью дня (владелица, после 5.2):
+    // макс ккал + активность, макс Б/Ж/У + «на 100 ккал» из цели.
+    // Нижние не двигаются. src/lib/goals.ts → effectiveBounds.
+    maxFollowsActivity: boolean('max_follows_activity').notNull().default(false),
     ...syncColumns,
   },
   (t) => [index('goal_settings_user_sync_idx').on(t.userId, t.serverUpdatedAt)],

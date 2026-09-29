@@ -3,6 +3,7 @@ import {
   applyDayTypeDelta,
   computeDayBoundsStatus,
   computeDayGoal,
+  effectiveMaxBounds,
   dayActivityKcal,
   energyDifference,
   hasBaseGoal,
@@ -37,6 +38,7 @@ const settings: GoalInput = {
   maxFat: null,
   minCarbs: null,
   maxCarbs: null,
+  maxFollowsActivity: false,
 }
 
 /** Все настройки в этом файле заполнены — цель точно есть, разворачиваем null для краткости тестов. */
@@ -125,6 +127,7 @@ describe('computeDayGoal', () => {
       maxFat: null,
       minCarbs: null,
       maxCarbs: null,
+      maxFollowsActivity: false,
     }
     expect(computeDayGoal(empty, 0)).toBeNull()
   })
@@ -339,13 +342,53 @@ describe('computeDayBoundsStatus', () => {
     maxFat: 80,
     minCarbs: null,
     maxCarbs: null,
+    maxFollowsActivity: false,
+    perHundredProtein: null,
+    perHundredFat: null,
+    perHundredCarbs: null,
   }
 
   it('считает независимо по каждому нутриенту, включая полностью незаданные', () => {
-    const status = computeDayBoundsStatus(bounds, { kcal: 1400, protein: 120, fat: 90, carbs: 300 })
+    const status = computeDayBoundsStatus(bounds, { kcal: 1400, protein: 120, fat: 90, carbs: 300 }, 0)
     expect(status.kcal).toBe('under') // ниже 1500
     expect(status.protein).toBe('ok') // выше 100, верхней нет
     expect(status.fat).toBe('over') // выше 80
     expect(status.carbs).toBeNull() // границ по У вообще нет
+  })
+})
+
+describe('effectiveMaxBounds', () => {
+  const bounds = {
+    minKcal: 1500,
+    maxKcal: 2000,
+    minProtein: 100,
+    maxProtein: 150,
+    minFat: null,
+    maxFat: 70,
+    minCarbs: null,
+    maxCarbs: null,
+    perHundredProtein: 2,
+    perHundredFat: null,
+    perHundredCarbs: 18,
+    maxFollowsActivity: true,
+  }
+
+  it('галочка включена: макс ккал + активность, макс Б/Ж/У + «на 100 ккал»', () => {
+    expect(effectiveMaxBounds(bounds, 500)).toEqual({ maxKcal: 2500, maxProtein: 160, maxFat: 70, maxCarbs: null })
+  })
+
+  it('галочка выключена — границы как вписаны', () => {
+    expect(effectiveMaxBounds({ ...bounds, maxFollowsActivity: false }, 500)).toEqual({
+      maxKcal: 2000,
+      maxProtein: 150,
+      maxFat: 70,
+      maxCarbs: null,
+    })
+  })
+
+  it('перебор по вписанному максимуму уже не перебор, если активность подняла границу; минимум не двигается', () => {
+    const status = computeDayBoundsStatus(bounds, { kcal: 2300, protein: 90, fat: 50, carbs: 250 }, 500)
+    expect(status.kcal).toBe('ok')
+    expect(status.protein).toBe('under')
   })
 })

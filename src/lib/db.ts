@@ -114,6 +114,7 @@ export interface GoalSettings {
   maxFat: number | null
   minCarbs: number | null
   maxCarbs: number | null
+  maxFollowsActivity: boolean
   createdAt: string
   updatedAt: string
   deletedAt: string | null
