@@ -328,7 +328,24 @@ function wireDayType(d: typeof dayTypes.$inferSelect) {
 // snack_id, и если офлайн создали продукт/перекус и запись с ним в одной
 // сессии, всё это уезжает одним POST — foods/snacks должны попасть в базу
 // раньше entries, которые на них ссылаются.
+/**
+ * Падение POST раньше уходило голым 500 без текста — у владелицы синк
+ * висел с «Ждут отправки», а причину не видно ни ей, ни в логах (wrangler
+ * tail недоступен). Теперь текст ошибки базы (например, какое ограничение
+ * нарушено) возвращается клиенту и виден в Настройках → «подробнее».
+ */
 export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx) => {
+  try {
+    return await handlePost(ctx)
+  } catch (err) {
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : null
+    const message = cause ?? (err instanceof Error ? err.message : String(err))
+    console.error('sync POST failed', err)
+    return error(500, `sync_failed: ${message.slice(0, 400)}`)
+  }
+}
+
+const handlePost: PagesFunction<Env, string, AuthedData> = async (ctx) => {
   if (!sameOrigin(ctx.request, ctx.env.APP_URL)) return error(403, 'forbidden')
 
   const db = getDb(ctx.env)
