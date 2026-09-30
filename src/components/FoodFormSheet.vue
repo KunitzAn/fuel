@@ -190,7 +190,13 @@ function onBarcodeScanned(code: string) {
         />
       </div>
 
+      <!-- Поля формы — Б Ж У, как на этикетках (владелица); везде в
+           остальных местах порядок Ж У Б -->
       <div class="grid grid-cols-3 gap-2">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs text-muted">Белки*</span>
+          <input v-model="proteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+        </label>
         <label class="flex flex-col gap-1">
           <span class="text-xs text-muted">Жиры*</span>
           <input v-model="fatInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
@@ -199,12 +205,8 @@ function onBarcodeScanned(code: string) {
           <span class="text-xs text-muted">Углеводы*</span>
           <input v-model="carbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
         </label>
-        <label class="flex flex-col gap-1">
-          <span class="text-xs text-muted">Белки*</span>
-          <input v-model="proteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-        </label>
       </div>
-      <p v-if="exceeds100" class="text-xs text-amber-600">Ж + У + Б получается больше 100 г на 100 г — проверьте, не опечатка ли</p>
+      <p v-if="exceeds100" class="text-xs text-amber-600">Б + Ж + У получается больше 100 г на 100 г — проверьте, не опечатка ли</p>
 
       <div class="flex items-end gap-2">
         <label class="flex-1 flex flex-col gap-1">
