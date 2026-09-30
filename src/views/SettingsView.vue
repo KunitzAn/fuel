@@ -3,9 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getTokenStatus, issueToken, type TokenStatus } from '../lib/apiTokens'
 import { checkSession, logout, me } from '../lib/auth'
-import { formatTime, todayLocalDate } from '../lib/date'
+import { formatDayShort, formatTime, todayLocalDate } from '../lib/date'
 import { db } from '../lib/db'
 import { saveGoalSettings } from '../lib/goalSettings'
+import { replacedVersionDates, type GoalSettingsRange } from '../lib/goalSettingsPlan'
 import { pickGoalSettingsForDate } from '../lib/goals'
 import { kcalFromMacros, parseDecimal } from '../lib/nutrition'
 import { lastSyncError, pendingCount, runSync, syncing } from '../lib/sync'
@@ -275,10 +276,24 @@ function toggleBounds(e: Event) {
   }
 }
 
+// С какого дня действуют сохранённые настройки (владелица, после этапа 6):
+// с сегодня (как раньше), с выбранной даты и дальше — или на период.
+const applyMode = ref<'today' | 'from' | 'period'>('today')
+const applyFrom = ref(todayLocalDate())
+const applyTo = ref('')
+const applyRange = computed<GoalSettingsRange | null>(() => {
+  if (applyMode.value === 'today') return { from: todayLocalDate(), to: null }
+  if (!applyFrom.value) return null
+  if (applyMode.value === 'from') return { from: applyFrom.value, to: null }
+  if (!applyTo.value || applyTo.value < applyFrom.value) return null
+  return { from: applyFrom.value, to: applyTo.value }
+})
+const replacedDates = computed(() => (applyRange.value ? replacedVersionDates(goalRows.value, applyRange.value) : []))
+
 const kcalError = ref<string | null>(null)
 const goalsSavedJustNow = ref(false)
 async function saveGoals() {
-  if (!goalsFormReady.value) return
+  if (!goalsFormReady.value || !applyRange.value) return
   kcalError.value = null
   const [baseProtein, baseFat, baseCarbs, restingKcal] = resolveGroup([
     baseProteinInput.value,
@@ -331,7 +346,7 @@ async function saveGoals() {
     minCarbs: parseDecimal(minCarbsInput.value),
     maxCarbs: parseDecimal(maxCarbsInput.value),
     maxFollowsActivity: maxFollowsActivity.value,
-  })
+  }, applyRange.value)
   goalsSavedJustNow.value = true
   setTimeout(() => (goalsSavedJustNow.value = false), 2000)
 }
@@ -465,7 +480,7 @@ async function saveGoals() {
         </div>
 
         <p class="text-xs text-muted">
-          Прибавка от активности только положительная — цель не опускается ниже дефолтной. Изменение действует с сегодняшнего дня, прошлые дни остаются со своими цифрами.
+          Прибавка от активности только положительная — цель не опускается ниже дефолтной. С какого дня действует изменение — выбирается внизу, у «Сохранить».
         </p>
       </template>
     </section>
@@ -583,18 +598,51 @@ async function saveGoals() {
     </section>
 
     <section class="mt-3 flex flex-col gap-2">
+      <div class="rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+        <span class="text-sm font-semibold text-ink">Применить</span>
+        <div class="flex gap-1 text-sm">
+          <button
+            v-for="m in [{ v: 'today', l: 'С сегодня' }, { v: 'from', l: 'С даты' }, { v: 'period', l: 'На период' }] as const"
+            :key="m.v"
+            type="button"
+            @click="applyMode = m.v"
+            class="flex-1 py-2 rounded-xl border"
+            :class="applyMode === m.v ? 'bg-accent text-white border-accent' : 'border-line text-muted'"
+          >
+            {{ m.l }}
+          </button>
+        </div>
+        <div v-if="applyMode !== 'today'" class="grid gap-2" :class="applyMode === 'period' ? 'grid-cols-2' : 'grid-cols-1'">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">С</span>
+            <input v-model="applyFrom" type="date" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label v-if="applyMode === 'period'" class="flex flex-col gap-1">
+            <span class="text-xs text-muted">По (включительно)</span>
+            <input v-model="applyTo" type="date" :min="applyFrom" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+        </div>
+        <p v-if="!applyRange" class="text-xs text-amber-600">Укажите даты: «по» не раньше «с».</p>
+        <p v-else class="text-xs text-muted">
+          Дни с {{ formatDayShort(applyRange.from) }}<template v-if="applyRange.to"> по {{ formatDayShort(applyRange.to) }}</template
+          ><template v-else> и дальше</template> посчитаются по этим настройкам<template v-if="applyRange.to">, после — как было</template>.
+          <template v-if="replacedDates.length">
+            Заменит настройки, сохранённые с {{ replacedDates.map(formatDayShort).join(', ') }}.
+          </template>
+        </p>
+      </div>
       <p v-if="!goalsFormReady" class="text-xs text-muted">Подтягиваю то, что уже настроено…</p>
       <button
         type="button"
-        :disabled="!goalsFormReady"
+        :disabled="!goalsFormReady || !applyRange"
         @click="saveGoals"
         class="rounded-2xl py-3 text-sm font-medium text-white bg-accent disabled:opacity-40"
       >
         {{ goalsSavedJustNow ? 'Сохранено' : 'Сохранить' }}
       </button>
       <p class="text-xs text-muted">
-        Выключенный чекбокс выше — только черновик формы, ничего не стирается, пока не нажата «Сохранить». Прошлые
-        дни и версии настроек, где что-то уже было настроено, в статистике не меняются.
+        Выключенный чекбокс выше — только черновик формы, ничего не стирается, пока не нажата «Сохранить». Дни до
+        выбранной даты остаются со своими цифрами.
       </p>
     </section>
 
