@@ -49,7 +49,7 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
     foodId: item.foodId,
     catalogId: item.catalogId,
     name: item.name,
-    brand: item.brand,
+    brand: null, // марка уже в названии (pick.ts → withBrand)
     protein: item.protein,
     fat: item.fat,
     carbs: item.carbs,

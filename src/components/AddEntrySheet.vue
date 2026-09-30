@@ -74,7 +74,7 @@ function onFoodDeleted() {
       <div class="flex items-start justify-between gap-2">
         <div>
           <h2 class="text-base font-semibold text-ink">
-            {{ item.name }}<span v-if="item.brand" class="font-normal text-muted"> · {{ item.brand }}</span>
+            {{ item.name }}
           </h2>
           <p class="text-xs text-muted">
             на 100 г: Б {{ per100.protein }} · Ж {{ per100.fat }} · У {{ per100.carbs }} · {{ Math.round(per100.kcal) }} ккал

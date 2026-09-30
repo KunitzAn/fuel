@@ -5,6 +5,7 @@
 import { Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import FoodFormSheet from './FoodFormSheet.vue'
+import { withBrand } from '../lib/pick'
 import { db, type Entry, type Food } from '../lib/db'
 import { softDeleteEntry, updateEntryGrams } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
@@ -68,7 +69,7 @@ async function remove() {
     <div class="relative w-full max-w-md rounded-t-3xl bg-bg px-4 pt-5 pb-8 flex flex-col gap-4">
       <div class="flex items-start justify-between gap-2">
         <div>
-          <h2 class="text-base font-semibold text-ink">{{ entry.name }}</h2>
+          <h2 class="text-base font-semibold text-ink">{{ withBrand(entry.name, entry.brand) }}</h2>
           <p class="text-xs text-muted">
             на 100 г: Б {{ per100.protein }} · Ж {{ per100.fat }} · У {{ per100.carbs }} · {{ Math.round(per100.kcal) }} ккал
           </p>

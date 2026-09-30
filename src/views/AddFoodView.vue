@@ -12,7 +12,7 @@ import { useCatalogSearch } from '../lib/catalog'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
 import { db, type Entry } from '../lib/db'
 import { addEntry, targetLabel, type MealTarget } from '../lib/diary'
-import { pickFromCatalog, pickFromEntry, pickFromFood, type PickItem } from '../lib/pick'
+import { pickFromCatalog, pickFromEntry, pickFromFood, withBrand, type PickItem } from '../lib/pick'
 import { matchesQuery } from '../lib/search'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
@@ -73,7 +73,7 @@ function buildHistory(filter: HistoryFilter) {
   const usedAt = new Map<string, string>() // когда последний раз — в выбранном приёме
   for (const e of allEntries.value) {
     const key = e.foodId ? `food:${e.foodId}` : e.catalogId ? `catalog:${e.catalogId}` : null
-    if (!key || !matchesQuery(query.value, e.name, e.brand)) continue
+    if (!key || !matchesQuery(query.value, withBrand(e.name, e.brand))) continue
     const prev = latest.get(key)
     if (!prev || e.createdAt > prev.createdAt) latest.set(key, e)
     if (filter !== 'all' && e.meal !== filter) continue
@@ -100,7 +100,7 @@ const searchHistoryRows = computed(() => buildHistory('all'))
 
 const productRows = computed(() =>
   allFoods.value
-    .filter((f) => f.kind === 'product' && matchesQuery(query.value, f.name, f.brand))
+    .filter((f) => f.kind === 'product' && matchesQuery(query.value, withBrand(f.name, f.brand)))
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
     .map(pickFromFood),
 )
@@ -240,9 +240,6 @@ function rowOn(item: PickItem) {
     'update:grams': (g: number) => setSelectionGrams(item, g),
   }
 }
-function subtitleFor(item: PickItem): string | null {
-  return item.brand
-}
 // ✎ — своя версия продукта из базы (README «Мои версии продуктов из базы»)
 function titleFor(item: PickItem): string {
   return item.food?.sourceCatalogId ? `${item.name} ✎` : item.name
@@ -309,7 +306,7 @@ function titleFor(item: PickItem): string {
         <template v-if="searchBlocks.products.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Продукты</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow v-for="item in searchBlocks.products" :key="item.key" :title="titleFor(item)" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+            <FoodListRow v-for="item in searchBlocks.products" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <template v-if="searchBlocks.dishes.length">
@@ -322,7 +319,7 @@ function titleFor(item: PickItem): string {
         <template v-if="searchBlocks.catalog.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">База</h3>
           <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
-            <FoodListRow v-for="item in searchBlocks.catalog" :key="item.key" :title="titleFor(item)" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+            <FoodListRow v-for="item in searchBlocks.catalog" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <p v-else-if="catalog.status.value === 'loading'" class="text-xs text-muted px-1 mb-4">База: ищу…</p>
@@ -364,7 +361,7 @@ function titleFor(item: PickItem): string {
       <template v-else-if="tab === 'products'">
         <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
           <p v-if="productRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
-          <FoodListRow v-for="item in productRows" :key="item.key" :title="titleFor(item)" :subtitle="subtitleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
+          <FoodListRow v-for="item in productRows" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
         <button type="button" @click="creatingKind = 'product'" class="text-sm text-accent px-1">+ Новый продукт</button>
       </template>

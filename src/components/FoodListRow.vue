@@ -8,7 +8,6 @@ import { Plus } from '@lucide/vue'
 
 const props = defineProps<{
   title: string
-  subtitle?: string | null
   trailing?: string
   selectable?: boolean
   selected?: boolean
@@ -36,8 +35,8 @@ function onRowClick() {
       @click.stop="emit('toggle')"
       class="w-4 h-4 accent-[var(--accent)] shrink-0"
     />
-    <span class="flex-1 text-sm text-ink truncate">
-      {{ title }}<span v-if="subtitle" class="text-muted"> · {{ subtitle }}</span>
+    <span class="flex-1 min-w-0 text-sm text-ink break-words">
+      {{ title }}
     </span>
     <span v-if="trailing" class="text-xs text-muted shrink-0">{{ trailing }}</span>
 

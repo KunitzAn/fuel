@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import type { Entry } from '../lib/db'
 import { softDeleteEntry } from '../lib/diary'
 import { scaleByGrams } from '../lib/nutrition'
+import { withBrand } from '../lib/pick'
 import GramsEditSheet from './GramsEditSheet.vue'
 
 const props = defineProps<{ entries: Entry[] }>()
@@ -66,9 +67,9 @@ function onTouchEnd(e: TouchEvent, entry: Entry) {
       @touchmove="onTouchMove"
       @touchend="onTouchEnd($event, entry)"
     >
-      <span class="flex-1 text-sm text-ink truncate">{{ entry.name }}</span>
+      <span class="flex-1 min-w-0 text-sm text-ink break-words">{{ withBrand(entry.name, entry.brand) }}</span>
       <span class="text-xs text-muted shrink-0">{{ entry.grams }} г</span>
-      <span class="text-xs text-muted shrink-0 w-12 text-right">
+      <span class="text-xs text-muted shrink-0 whitespace-nowrap text-right">
         {{ Math.round(entryTotal(entry).kcal) }} ккал
       </span>
     </li>

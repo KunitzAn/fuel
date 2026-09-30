@@ -7,7 +7,7 @@
 import { ArrowLeft, ScanLine } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import type { Food } from '../lib/db'
-import type { PickItem } from '../lib/pick'
+import { withBrand, type PickItem } from '../lib/pick'
 import {
   createFood,
   kcalFromMacros,
@@ -30,8 +30,9 @@ const isVersion = computed(() => (props.food ? !!props.food.sourceCatalogId : !!
 
 // Откуда заполнять поля: свой продукт при правке, иначе продукт из базы
 const src = props.food ?? props.base
-const name = ref(src?.name ?? '')
-const brand = ref(src?.brand ?? '')
+// Марка — часть названия (pick.ts → withBrand); у старого своего продукта
+// она ещё могла лежать отдельно — склеиваем в поле названия
+const name = ref(props.food ? withBrand(props.food.name, props.food.brand) : (props.base?.name ?? ''))
 const barcode = ref(src?.barcode ?? props.presetBarcode ?? '')
 const scanningBarcode = ref(false)
 const note = ref(props.food?.note ?? '')
@@ -83,7 +84,7 @@ async function save(addNow: boolean) {
   const draft = {
     kind: props.kind,
     name: name.value.trim(),
-    brand: props.kind === 'product' && brand.value.trim() ? brand.value.trim() : null,
+    brand: null,
     barcode: props.kind === 'product' && barcode.value.trim() ? barcode.value.trim() : null,
     protein: per100.value.protein,
     fat: per100.value.fat,
@@ -145,10 +146,6 @@ function onBarcodeScanned(code: string) {
         <input v-model="name" type="text" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
       </label>
 
-      <label v-if="kind === 'product'" class="flex flex-col gap-1">
-        <span class="text-xs text-muted">Марка</span>
-        <input v-model="brand" type="text" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-      </label>
 
       <label v-if="kind === 'product'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Штрихкод</span>

@@ -24,8 +24,8 @@ export interface PickItem {
   key: string
   foodId: string | null
   catalogId: string | null
+  /** Уже с маркой (`withBrand`) — отдельной марки у того, что добавляем, нет. */
   name: string
-  brand: string | null
   /** Переносится в «мою версию» — сканер (этап 3) сначала ищет штрихкод среди своих. */
   barcode: string | null
   protein: number // на 100 г
@@ -38,6 +38,18 @@ export interface PickItem {
   food: Food | null
 }
 
+/**
+ * Марка — часть названия (владелица, после этапа 6: «одно общее поле с
+ * маркой и продуктом сразу»). Отдельное `brand` осталось только в базе
+ * продуктов (fuel-catalog, Open Food Facts) и в старых строках — склеиваем
+ * здесь, на входе в приложение. Если марка уже есть в названии — не дублируем.
+ */
+export function withBrand(name: string, brand: string | null | undefined): string {
+  const b = brand?.trim()
+  if (!b || name.toLowerCase().includes(b.toLowerCase())) return name
+  return `${b} ${name}`
+}
+
 export const pickKeyForFood = (id: string) => `food:${id}`
 export const pickKeyForCatalog = (id: string) => `catalog:${id}`
 
@@ -46,8 +58,7 @@ export function pickFromFood(food: Food): PickItem {
     key: pickKeyForFood(food.id),
     foodId: food.id,
     catalogId: null,
-    name: food.name,
-    brand: food.brand,
+    name: withBrand(food.name, food.brand),
     barcode: food.barcode,
     protein: food.protein,
     fat: food.fat,
@@ -64,8 +75,7 @@ export function pickFromCatalog(item: CatalogItem, lastGrams: number | null): Pi
     key: pickKeyForCatalog(item.id),
     foodId: null,
     catalogId: item.id,
-    name: item.name,
-    brand: item.brand,
+    name: withBrand(item.name, item.brand),
     barcode: item.barcode,
     protein: item.protein,
     fat: item.fat,
@@ -89,8 +99,7 @@ export function pickFromEntry(entry: Entry, foodsById: Map<string, Food>): PickI
     key: entry.foodId ? pickKeyForFood(entry.foodId) : pickKeyForCatalog(entry.catalogId!),
     foodId: entry.foodId,
     catalogId: entry.catalogId,
-    name: entry.name,
-    brand: entry.brand,
+    name: withBrand(entry.name, entry.brand),
     barcode: null,
     protein: entry.protein,
     fat: entry.fat,
