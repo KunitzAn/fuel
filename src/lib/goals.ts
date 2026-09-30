@@ -121,18 +121,21 @@ export function sumActivityKcal(activities: Pick<Activity, 'kcal'>[]): number {
 }
 
 /**
- * Активность дня: `training` — ручные активности и тренировки (таблица
- * `activities`), от них прибавка к цели; `total` — плюс активная энергия
- * за день из Здоровья (Команда iOS, этап 5.2), это «потрачено». Владелица
- * решила складывать всё, даже если тренировка есть и там, и там — риск
- * двойного счёта на её стороне. Нет данных из Здоровья — только ручные.
+ * Активность дня = ручные активности + активная энергия за день из
+ * Здоровья (Команда iOS, этап 5.2) — и для «потрачено», и для прибавки
+ * «на 100 ккал» (владелица, 30.09: «данные из Здоровья тоже учитывать»;
+ * до этого на полдня прибавка считалась только от ручных — она думала,
+ * что Здоровье отдаёт тренировки, а оно отдаёт всю активную энергию).
+ * Поля `training`/`total` оставлены раздельными на случай, если позже
+ * понадобится снова считать прибавку не от всего. Владелица решила
+ * складывать всё, даже если тренировка есть и там, и там.
  */
 export function dayActivity(
   activities: Pick<Activity, 'kcal'>[],
   health: Pick<DailyActiveEnergy, 'totalActiveKcal'> | null,
 ): DayActivity {
-  const training = sumActivityKcal(activities)
-  return { training, total: training + (health?.totalActiveKcal ?? 0) }
+  const total = sumActivityKcal(activities) + (health?.totalActiveKcal ?? 0)
+  return { training: total, total }
 }
 
 /** README: «разница = съедено − потрачено» — минус означает дефицит. */

@@ -154,25 +154,19 @@ describe('sumActivityKcal', () => {
 })
 
 describe('dayActivity', () => {
-  it('тренировки/ручные отдельно, всё вместе со Здоровьем — отдельно', () => {
-    expect(dayActivity([{ kcal: 300 }], { totalActiveKcal: 1152 })).toEqual({ training: 300, total: 1452 })
+  it('ручные + Здоровье складываются — и для прибавки, и для «потрачено»', () => {
+    expect(dayActivity([{ kcal: 300 }], { totalActiveKcal: 1152 })).toEqual({ training: 1452, total: 1452 })
   })
   it('нет данных из Здоровья — только ручные', () => {
     expect(dayActivity([{ kcal: 300 }], null)).toEqual({ training: 300, total: 300 })
   })
-  it('строка из Здоровья есть, но активная ещё не пришла (только покой) — не ломает счёт', () => {
+  it('строка из Здоровья есть, но активная ещё не пришла — не ломает счёт', () => {
     expect(dayActivity([], { totalActiveKcal: null })).toEqual({ training: 0, total: 0 })
   })
-  it('Здоровье идёт в «потрачено», но не в прибавку «на 100 ккал»', () => {
+  it('Здоровье поднимает цель через «на 100 ккал»', () => {
     const g = goal(settings, dayActivity([], { totalActiveKcal: 500 }))
-    expect(g.carbs).toBe(150)
-    expect(g.changedByActivity).toBe(false)
+    expect(g.carbs).toBe(150 + 90) // 500/100 × 18
     expect(g.spentKcal).toBe(1450 + 500)
-  })
-  it('ручная тренировка поднимает цель, Здоровье — только «потрачено»', () => {
-    const g = goal(settings, dayActivity([{ kcal: 400 }], { totalActiveKcal: 600 }))
-    expect(g.carbs).toBe(150 + 72) // 400/100 × 18
-    expect(g.spentKcal).toBe(1450 + 1000)
   })
 })
 
