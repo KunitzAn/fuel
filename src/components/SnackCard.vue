@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, Plus, Trash2 } from '@lucide/vue'
+import { Apple, ChevronDown, Plus, Trash2 } from '@lucide/vue'
 import { computed, nextTick, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Entry, Snack } from '../lib/db'
@@ -56,6 +56,11 @@ function remove() {
       style="top: calc(env(safe-area-inset-top) + var(--day-header-h, 0px))"
     >
       <div class="flex items-center gap-2 px-4 pt-3">
+        <!-- Одна общая иконка на все доп. приёмы (владелица), в том же кружке,
+             что у завтрака/обеда/ужина -->
+        <span class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-(--card-color)/15">
+          <Apple :size="16" class="text-(--card-color)" />
+        </span>
         <input
           v-if="renaming"
           ref="nameInput"
