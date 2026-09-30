@@ -14,10 +14,10 @@ import { pickFromEntry, type PickItem } from '../lib/pick'
 const props = defineProps<{ entry: Entry }>()
 const emit = defineEmits<{ close: [] }>()
 
-// Правка/удаление самого продукта — не этой записи. Прошлый снимок КБЖУ в
-// entry от этого не меняется (README «Правка и удаление» — прошлые дни
-// не трогаем), поэтому после правки просто закрываем шторку с формой, а
-// не пытаемся обновить цифры на экране.
+// Правка/удаление самого продукта — не этой записи. Правка продукта
+// переписывает и эту запись (foods.ts → updateFood), а `entry` здесь —
+// снимок на момент открытия окна, поэтому после сохранения закрываем окно
+// целиком: дневник за ним живой и уже показывает новые цифры.
 // Запись из базы (catalogId) — карандаш ведёт к «моей версии» (этап 2.6),
 // а если она уже есть — к её правке, а не к ещё одной копии.
 const editing = ref<{ food?: Food; base?: PickItem } | null>(null)
@@ -31,7 +31,7 @@ async function openFoodEdit() {
   if (food) editing.value = { food }
   else if (catalogId) editing.value = { base: pickFromEntry(props.entry, new Map())! }
 }
-function onFoodDeleted() {
+function closeAll() {
   editing.value = null
   emit('close')
 }
@@ -129,8 +129,8 @@ async function remove() {
       :food="editing.food"
       :base="editing.base"
       @close="editing = null"
-      @saved="editing = null"
-      @deleted="onFoodDeleted"
+      @saved="closeAll"
+      @deleted="closeAll"
     />
   </div>
 </template>

@@ -9,6 +9,7 @@ import { computed, ref } from 'vue'
 import type { Food } from '../lib/db'
 import { withBrand, type PickItem } from '../lib/pick'
 import {
+  countFoodEntries,
   createFood,
   kcalFromMacros,
   macrosExceed100,
@@ -33,6 +34,11 @@ const src = props.food ?? props.base
 // Марка — часть названия (pick.ts → withBrand); у старого своего продукта
 // она ещё могла лежать отдельно — склеиваем в поле названия
 const name = ref(props.food ? withBrand(props.food.name, props.food.brand) : (props.base?.name ?? ''))
+// Правка меняет и записи в дневнике (foods.ts → updateFood); галочка —
+// сохранить отдельной копией, не трогая ни этот продукт, ни записи
+const saveAsCopy = ref(false)
+const entriesCount = ref(0)
+if (props.food) void countFoodEntries(props.food.id).then((n) => (entriesCount.value = n))
 const barcode = ref(src?.barcode ?? props.presetBarcode ?? '')
 const scanningBarcode = ref(false)
 const note = ref(props.food?.note ?? '')
@@ -93,7 +99,13 @@ async function save(addNow: boolean) {
     note: props.kind === 'dish' && note.value.trim() ? note.value.trim() : null,
   }
   let id: string
-  if (props.food) {
+  if (props.food && saveAsCopy.value) {
+    // Копия — самостоятельный продукт: не «моя версия» базы (иначе две
+    // версии одного продукта спорили бы в поиске), оригинал и его записи
+    // не трогаем. Название не меняли — помечаем, чтобы не спутать.
+    const sameName = draft.name === withBrand(props.food.name, props.food.brand)
+    id = await createFood({ ...draft, name: sameName ? `${draft.name} (копия)` : draft.name })
+  } else if (props.food) {
     id = props.food.id
     await updateFood(id, draft)
   } else {
@@ -208,6 +220,18 @@ function onBarcodeScanned(code: string) {
       <label v-if="kind === 'dish'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Заметка (из чего и в каких пропорциях — в расчётах не участвует)</span>
         <textarea v-model="note" rows="3" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent resize-none" />
+      </label>
+
+      <label v-if="isEdit" class="flex items-start gap-2">
+        <input v-model="saveAsCopy" type="checkbox" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
+        <span>
+          <span class="block text-sm text-ink">Сохранить как копию</span>
+          <span class="block text-xs text-muted">
+            <template v-if="saveAsCopy">Будет новый {{ kind === 'product' ? 'продукт' : 'блюдо' }}, этот и записи с ним не изменятся.</template>
+            <template v-else-if="entriesCount > 0">Без галочки изменения попадут и во все записи в дневнике с этим {{ kind === 'product' ? 'продуктом' : 'блюдом' }} ({{ entriesCount }}).</template>
+            <template v-else>Будет новый {{ kind === 'product' ? 'продукт' : 'блюдо' }}, этот останется как есть.</template>
+          </span>
+        </span>
       </label>
 
       <button v-if="isEdit" type="button" @click="remove" class="text-sm text-red-500 text-left">

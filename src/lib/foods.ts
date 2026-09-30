@@ -33,10 +33,41 @@ export async function createFood(draft: FoodDraft, sourceCatalogId: string | nul
   return id
 }
 
+/**
+ * Правка продукта/блюда меняет и все записи дневника с ним — название и
+ * КБЖУ на 100 г, граммы остаются (владелица, после этапа 6; раньше запись
+ * была неизменным снимком). Не хочешь трогать прошлое — «Сохранить как
+ * копию» в форме, это `createFood`.
+ */
 export async function updateFood(id: string, draft: FoodDraft): Promise<void> {
   const now = new Date().toISOString()
-  await db.foods.update(id, { ...draft, updatedAt: now, dirty: true })
+  await db.transaction('rw', db.foods, db.entries, async () => {
+    await db.foods.update(id, { ...draft, updatedAt: now, dirty: true })
+    await db.entries
+      .where('foodId')
+      .equals(id)
+      .filter((e) => e.deletedAt === null)
+      .modify({
+        name: draft.name,
+        brand: null,
+        protein: draft.protein,
+        fat: draft.fat,
+        carbs: draft.carbs,
+        kcal: draft.kcal,
+        updatedAt: now,
+        dirty: true,
+      })
+  })
   void runSync()
+}
+
+/** Сколько живых записей дневника с этим продуктом — подсказка в форме правки. */
+export function countFoodEntries(id: string): Promise<number> {
+  return db.entries
+    .where('foodId')
+    .equals(id)
+    .filter((e) => e.deletedAt === null)
+    .count()
 }
 
 export async function softDeleteFood(id: string): Promise<void> {
