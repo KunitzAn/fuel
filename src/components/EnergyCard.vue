@@ -102,11 +102,14 @@ function runShortcut() {
       </button>
     </template>
 
-    <ActivityFormSheet
-      v-if="editingActivity"
-      :date="date"
-      :activity="editingActivity === 'new' ? undefined : editingActivity"
-      @close="editingActivity = null"
-    />
+    <!-- В body — см. EntryList.vue: стеклянная карточка обрезала бы окно -->
+    <Teleport to="body">
+      <ActivityFormSheet
+        v-if="editingActivity"
+        :date="date"
+        :activity="editingActivity === 'new' ? undefined : editingActivity"
+        @close="editingActivity = null"
+      />
+    </Teleport>
   </section>
 </template>

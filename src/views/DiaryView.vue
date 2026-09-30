@@ -295,7 +295,9 @@ onBeforeRouteLeave((to) => {
       class="sticky z-20 -mx-4 px-4 -my-2 py-2"
       style="top: env(safe-area-inset-top)"
     >
-      <div class="rounded-3xl glass glow-tr px-4 pt-3 pb-3.5 grid grid-cols-[1fr_1fr_1fr_1.2fr] gap-x-2.5" style="--glow: var(--kcal)">
+      <div class="rounded-3xl glass glow-tr px-4 pt-3 pb-3.5 grid grid-cols-[1fr_1fr_1fr_1.2fr] gap-x-2.5"
+        style="--glow: var(--kcal); background-color: color-mix(in srgb, var(--card-solid) 88%, transparent)"
+      >
         <div v-if="activityGoal" class="col-span-4 flex justify-center mb-2.5">
           <div class="flex rounded-full glass p-0.5 text-xs">
             <button

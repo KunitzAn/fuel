@@ -36,7 +36,11 @@ function commitRename() {
   if (nameDraft.value.trim() !== props.snack.name) void renameSnack(props.snack.id, nameDraft.value)
 }
 
+// Перекус с едой — удаляется вместе со всей едой в нём, поэтому
+// спрашиваем (владелица); пустой — удаляем сразу, как раньше
 function remove() {
+  const n = props.entries.length
+  if (n > 0 && !window.confirm(`Удалить «${props.snack.name}» и всю еду в нём (${n})?`)) return
   void softDeleteSnack(props.snack.id)
 }
 </script>

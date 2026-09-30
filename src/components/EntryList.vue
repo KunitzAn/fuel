@@ -76,5 +76,10 @@ function onTouchEnd(e: TouchEvent, entry: Entry) {
     </li>
   </ul>
 
-  <GramsEditSheet v-if="editingEntry" :entry="editingEntry" @close="editingEntry = null" />
+  <!-- В body: карточка приёма — «стекло» с backdrop-filter, а он делает её
+       рамкой для position: fixed, и окно обрезалось бы внутри карточки
+       (владелица: в перекусе окно граммов открывалось без поля граммов) -->
+  <Teleport to="body">
+    <GramsEditSheet v-if="editingEntry" :entry="editingEntry" @close="editingEntry = null" />
+  </Teleport>
 </template>
