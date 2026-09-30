@@ -13,14 +13,15 @@ import { setActualDayType, setPlannedDayType, type DayTypePlan } from '../lib/da
 import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } from '../lib/diary'
 import { db } from '../lib/db'
 import {
-  applyDayTypeDelta,
-  computeDayStatus,
+  dayGoalWithPlan,
+  displayDayStatus,
   computeDayGoal,
   pickGoalSettingsForDate,
   dayActivityKcal,
   type DayTypeKind,
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
+import { statusTextClass } from '../lib/statusColors'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner']
@@ -57,16 +58,7 @@ const activityGoal = computed(() =>
 // простановки, не пересчитывается сам (см. db/schema.ts). Складывается с
 // activityGoal независимо от активности.
 const dayType = computed(() => allDayTypes.value.find((d) => d.date === date.value) ?? null)
-const dayGoal = computed(() => {
-  if (!activityGoal.value) return null
-  const dt = dayType.value
-  if (!dt?.planned) return activityGoal.value
-  return applyDayTypeDelta(activityGoal.value, {
-    protein: dt.plannedDeltaProtein ?? 0,
-    fat: dt.plannedDeltaFat ?? 0,
-    carbs: dt.plannedDeltaCarbs ?? 0,
-  })
-})
+const dayGoal = computed(() => dayGoalWithPlan(activityGoal.value, dayType.value))
 
 const pickingDayTypeKind = ref<DayTypeKind | null>(null)
 function pickPlan(kind: DayTypeKind | null) {
@@ -95,30 +87,8 @@ const dayTotals = computed(() =>
 // Границы берём из currentGoalSettings напрямую (4.5: «можно и с целями,
 // и без них»); активность — для галочки «верхние растут с активностью».
 const dayStatus = computed(() =>
-  computeDayStatus(
-    currentGoalSettings.value,
-    // ккал сравниваем так, как видно на экране (целыми), как и цель ниже
-    { ...dayTotals.value, kcal: Math.round(dayTotals.value.kcal) },
-    dayActivity.value,
-    dayGoal.value
-      ? {
-          kcal: Math.round(dayGoal.value.kcal),
-          protein: Math.round(dayGoal.value.protein),
-          fat: Math.round(dayGoal.value.fat),
-          carbs: Math.round(dayGoal.value.carbs),
-        }
-      : null,
-  ),
+  displayDayStatus(currentGoalSettings.value, dayTotals.value, dayActivity.value, dayGoal.value),
 )
-const statusTextClass: Record<'under' | 'over' | 'ok', string> = {
-  under: 'text-amber-600',
-  over: 'text-red-500',
-  ok: 'text-green-600',
-}
-function statusClass(status: 'under' | 'over' | 'ok' | null): string {
-  return status ? statusTextClass[status] : 'text-muted'
-}
-
 const mealEntries = computed(() => ({
   breakfast: dayEntries.value.filter((e) => e.meal === 'breakfast'),
   lunch: dayEntries.value.filter((e) => e.meal === 'lunch'),
@@ -243,25 +213,25 @@ onBeforeRouteLeave((to) => {
     <div class="rounded-2xl bg-card border border-line px-4 py-3 grid grid-cols-4 text-center">
       <div>
         <p class="text-[11px] text-muted">Б</p>
-        <p class="text-sm font-semibold" :class="statusClass(dayStatus.protein)">
+        <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.protein)">
           {{ dayTotals.protein.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.protein) }}<span v-if="dayGoal.proteinChanged">⚡</span></template>
         </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">Ж</p>
-        <p class="text-sm font-semibold" :class="statusClass(dayStatus.fat)">
+        <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.fat)">
           {{ dayTotals.fat.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.fat) }}<span v-if="dayGoal.fatChanged">⚡</span></template>
         </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">У</p>
-        <p class="text-sm font-semibold" :class="statusClass(dayStatus.carbs)">
+        <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.carbs)">
           {{ dayTotals.carbs.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.carbs) }}<span v-if="dayGoal.carbsChanged">⚡</span></template>
         </p>
       </div>
       <div>
         <p class="text-[11px] text-muted">Ккал</p>
-        <p class="text-sm font-semibold" :class="statusClass(dayStatus.kcal)">
+        <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.kcal)">
           {{ Math.round(dayTotals.kcal) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.kcal) }}</template>
         </p>
       </div>

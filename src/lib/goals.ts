@@ -221,6 +221,25 @@ export function statsDayTypeDelta(
   }
 }
 
+/**
+ * Цель дня целиком, как её видно в дневнике: база + активность, плюс
+ * поправка запланированного типа дня (снимок на момент простановки, 4.4).
+ * Одна функция и для дневника, и для статистики (этап 6) — чтобы лента не
+ * разошлась с дневником.
+ */
+export function dayGoalWithPlan(
+  activityGoal: DayGoal | null,
+  dayType: Pick<DayType, 'planned' | 'plannedDeltaProtein' | 'plannedDeltaFat' | 'plannedDeltaCarbs'> | null,
+): DayGoal | null {
+  if (!activityGoal) return null
+  if (!dayType?.planned) return activityGoal
+  return applyDayTypeDelta(activityGoal, {
+    protein: dayType.plannedDeltaProtein ?? 0,
+    fat: dayType.plannedDeltaFat ?? 0,
+    carbs: dayType.plannedDeltaCarbs ?? 0,
+  })
+}
+
 /** Складывает поправку типа дня с уже посчитанной (активностью) целью — независимые слагаемые. */
 export function applyDayTypeDelta(goal: DayGoal, delta: DayTypeDelta | null): DayGoal {
   if (!delta) return goal
@@ -329,4 +348,30 @@ export function computeDayStatus(
     return null
   }
   return { kcal: pick('kcal'), protein: pick('protein'), fat: pick('fat'), carbs: pick('carbs') }
+}
+
+/**
+ * `computeDayStatus` с цифрами так, как они видны на экране: ккал и цель
+ * целыми (Б/Ж/У факта — с десятыми, как в плашке). Одна обёртка на
+ * дневник и ленту статистики — чтобы цвет одного дня не отличался.
+ */
+export function displayDayStatus(
+  settings: BoundsInput | null,
+  eaten: { kcal: number; protein: number; fat: number; carbs: number },
+  activityKcal: number,
+  goal: DayGoal | null,
+): DayBoundsStatus {
+  return computeDayStatus(
+    settings,
+    { ...eaten, kcal: Math.round(eaten.kcal) },
+    activityKcal,
+    goal
+      ? {
+          kcal: Math.round(goal.kcal),
+          protein: Math.round(goal.protein),
+          fat: Math.round(goal.fat),
+          carbs: Math.round(goal.carbs),
+        }
+      : null,
+  )
 }
