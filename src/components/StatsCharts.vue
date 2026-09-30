@@ -154,16 +154,16 @@ const axis = computed(() => {
             <p class="text-sm font-semibold text-ink">{{ averages.differenceKcal === null ? '—' : signed(averages.differenceKcal) }}</p>
           </div>
           <div>
-            <p class="text-[11px] text-muted">Б, г</p>
-            <p class="text-sm font-semibold text-ink">{{ int(averages.eaten!.protein) }}</p>
-          </div>
-          <div>
             <p class="text-[11px] text-muted">Ж, г</p>
             <p class="text-sm font-semibold text-ink">{{ int(averages.eaten!.fat) }}</p>
           </div>
           <div>
             <p class="text-[11px] text-muted">У, г</p>
             <p class="text-sm font-semibold text-ink">{{ int(averages.eaten!.carbs) }}</p>
+          </div>
+          <div>
+            <p class="text-[11px] text-muted">Б, г</p>
+            <p class="text-sm font-semibold text-ink">{{ int(averages.eaten!.protein) }}</p>
           </div>
         </div>
         <p v-if="averages.totalDifferenceKcal !== null" class="mt-3 pt-3 border-t border-line text-sm text-ink flex justify-between">
@@ -186,9 +186,9 @@ const axis = computed(() => {
             >
           </span>
           <span class="block text-muted tabular-nums">
-            Б {{ int(selectedSummary.eaten.protein) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.protein) }}</template>
-            · Ж {{ int(selectedSummary.eaten.fat) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.fat) }}</template>
+            Ж {{ int(selectedSummary.eaten.fat) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.fat) }}</template>
             · У {{ int(selectedSummary.eaten.carbs) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.carbs) }}</template>
+            · Б {{ int(selectedSummary.eaten.protein) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.protein) }}</template>
             <span class="text-accent"> · открыть день ›</span>
           </span>
         </template>
@@ -202,9 +202,9 @@ const axis = computed(() => {
     <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 px-3">
       <span v-for="(label, i) in axis" :key="i">{{ label }}</span>
     </div>
-    <StatsBarChart title="Белки, г" :bars="barsFor('protein')" :selected="selected" height-class="h-16" @select="select" />
     <StatsBarChart title="Жиры, г" :bars="barsFor('fat')" :selected="selected" height-class="h-16" @select="select" />
     <StatsBarChart title="Углеводы, г" :bars="barsFor('carbs')" :selected="selected" height-class="h-16" @select="select" />
+    <StatsBarChart title="Белки, г" :bars="barsFor('protein')" :selected="selected" height-class="h-16" @select="select" />
     <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 px-3">
       <span v-for="(label, i) in axis" :key="i">{{ label }}</span>
     </div>

@@ -27,7 +27,7 @@ const statsDelta = computed(() =>
 
 function formatDelta(d: { protein: number; fat: number; carbs: number }): string {
   const part = (v: number, unit: string) => `${v > 0 ? '+' : ''}${Math.round(v)}${unit}`
-  return `Б ${part(d.protein, '')} · Ж ${part(d.fat, '')} · У ${part(d.carbs, '')}`
+  return `Ж ${part(d.fat, '')} · У ${part(d.carbs, '')} · Б ${part(d.protein, '')}`
 }
 
 function pick(source: 'manual' | 'stats') {

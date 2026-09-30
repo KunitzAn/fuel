@@ -69,16 +69,16 @@ function signed(n: number): string {
       <span v-if="!row.hasEntries" class="col-span-6 self-center text-center text-xs text-muted">— нет записей —</span>
       <template v-else>
         <span class="leading-tight">
-          <span class="block text-[13px] font-medium" :class="statusTextClass(row.status.protein)">{{ int(row.eaten.protein) }}</span>
-          <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.protein) }}<template v-if="row.goal.proteinChanged">⚡</template></span>
-        </span>
-        <span class="leading-tight">
           <span class="block text-[13px] font-medium" :class="statusTextClass(row.status.fat)">{{ int(row.eaten.fat) }}</span>
           <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.fat) }}<template v-if="row.goal.fatChanged">⚡</template></span>
         </span>
         <span class="leading-tight">
           <span class="block text-[13px] font-medium" :class="statusTextClass(row.status.carbs)">{{ int(row.eaten.carbs) }}</span>
           <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.carbs) }}<template v-if="row.goal.carbsChanged">⚡</template></span>
+        </span>
+        <span class="leading-tight">
+          <span class="block text-[13px] font-medium" :class="statusTextClass(row.status.protein)">{{ int(row.eaten.protein) }}</span>
+          <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.protein) }}<template v-if="row.goal.proteinChanged">⚡</template></span>
         </span>
         <span class="leading-tight">
           <span class="block text-[13px] font-medium" :class="statusTextClass(row.status.kcal)">{{ int(row.eaten.kcal) }}</span>

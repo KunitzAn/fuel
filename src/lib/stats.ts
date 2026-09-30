@@ -4,11 +4,10 @@
  * функциями, что и дневник (goals.ts), чтобы лента не разошлась с ним.
  */
 import { addMonths, daysInMonth, shiftDate, toDateString, weekDates, type Month } from './date'
-import type { Activity, DailyActiveEnergy, DayType, Entry, GoalSettings } from './db'
+import type { Activity, DailyActiveEnergy, Entry, GoalSettings } from './db'
 import {
   computeDayGoal,
   dayActivity,
-  dayGoalWithPlan,
   displayDayStatus,
   pickGoalSettingsForDate,
   type DayBoundsStatus,
@@ -21,14 +20,13 @@ export interface StatsSource {
   activities: Pick<Activity, 'date' | 'kcal'>[]
   health: Pick<DailyActiveEnergy, 'date' | 'totalActiveKcal'>[]
   goalSettings: GoalSettings[]
-  dayTypes: Pick<DayType, 'date' | 'planned' | 'plannedDeltaProtein' | 'plannedDeltaFat' | 'plannedDeltaCarbs'>[]
 }
 
 export interface DaySummary {
   date: string
   hasEntries: boolean
   eaten: Macros
-  /** Цель того дня — по версии настроек того дня, с активностью и типом дня. */
+  /** Цель того дня («Факт») — по версии настроек того дня, с прибавкой за тренировки. */
   goal: DayGoal | null
   /** Покой + активность; без цели покоя не знаем — `null`. */
   spentKcal: number | null
@@ -52,14 +50,15 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
   const entriesByDate = groupByDate(source.entries)
   const activitiesByDate = groupByDate(source.activities)
   const healthByDate = new Map(source.health.map((h) => [h.date, h]))
-  const dayTypeByDate = new Map(source.dayTypes.map((d) => [d.date, d]))
 
   return (date) => {
     const dayEntries = entriesByDate.get(date) ?? []
     const eaten = sumMacros(dayEntries.map((e) => scaleByGrams(e, e.grams)))
     const settings = pickGoalSettingsForDate(source.goalSettings, date)
     const activity = dayActivity(activitiesByDate.get(date) ?? [], healthByDate.get(date) ?? null)
-    const goal = dayGoalWithPlan(settings ? computeDayGoal(settings, activity) : null, dayTypeByDate.get(date) ?? null)
+    // Статистика — всегда «Факт» (владелица): цель с прибавкой за
+    // тренировки, без поправки запланированного типа дня
+    const goal = settings ? computeDayGoal(settings, activity) : null
     const spentKcal = goal ? goal.spentKcal : null
     return {
       date,

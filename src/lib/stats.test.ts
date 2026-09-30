@@ -46,7 +46,6 @@ const source: StatsSource = {
   activities: [{ date: '2026-09-21', kcal: 200 }],
   health: [{ date: '2026-09-21', totalActiveKcal: 300 }],
   goalSettings: [settings],
-  dayTypes: [{ date: '2026-09-22', planned: 'high', plannedDeltaProtein: 0, plannedDeltaFat: 0, plannedDeltaCarbs: 50 }],
 }
 
 describe('createDaySummarizer', () => {
@@ -62,11 +61,10 @@ describe('createDaySummarizer', () => {
     expect(s.status.kcal).toBe('ok') // 915 ≤ цели
   })
 
-  it('запланированный тип дня входит в цель, как в дневнике', () => {
+  it('статистика — «Факт»: без активности цель = база, съела больше — перебор', () => {
     const s = summarize('2026-09-22')
-    expect(s.goal!.carbs).toBe(250) // 200 + 50
-    expect(s.status.carbs).toBe('ok') // 250 ровно — не перебор
-    expect(s.status.kcal).toBe('ok') // 1525 при цели 1850
+    expect(s.goal!.carbs).toBe(200)
+    expect(s.status.carbs).toBe('over') // 250 при цели 200
   })
 
   it('день до первой версии настроек — без цели, потрачено неизвестно, цвет серый', () => {

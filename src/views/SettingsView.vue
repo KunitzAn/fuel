@@ -418,16 +418,16 @@ async function saveGoals() {
           <span class="text-xs text-muted">Цель по умолчанию (день без активности)</span>
           <div class="grid grid-cols-3 gap-2">
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-muted">Белки, г</span>
-              <input v-model="baseProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-            </label>
-            <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">Жиры, г</span>
               <input v-model="baseFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
             <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">Углеводы, г</span>
               <input v-model="baseCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Белки, г</span>
+              <input v-model="baseProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
           </div>
           <div class="flex items-end gap-2">
@@ -460,16 +460,16 @@ async function saveGoals() {
           <span class="text-xs text-muted">На каждые 100 ккал активности — прибавка к цели</span>
           <div class="grid grid-cols-3 gap-2">
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-muted">Б, г</span>
-              <input v-model="perHundredProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-            </label>
-            <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">Ж, г</span>
               <input v-model="perHundredFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
             <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">У, г</span>
               <input v-model="perHundredCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Б, г</span>
+              <input v-model="perHundredProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
           </div>
           <p class="text-xs text-muted">≈ {{ Math.round(perHundredKcalHint) }} ккал — подсказка, не входит в расчёт</p>
@@ -499,16 +499,16 @@ async function saveGoals() {
           <span class="text-xs text-muted">Высокоуглеводный день — прибавка к цели (вручную)</span>
           <div class="grid grid-cols-3 gap-2">
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-muted">Б, г</span>
-              <input v-model="highDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-            </label>
-            <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">Ж, г</span>
               <input v-model="highDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
             <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">У, г</span>
               <input v-model="highDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Б, г</span>
+              <input v-model="highDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
           </div>
         </div>
@@ -517,16 +517,16 @@ async function saveGoals() {
           <span class="text-xs text-muted">Низкоуглеводный день — убавка от цели (вручную, вводить положительным числом)</span>
           <div class="grid grid-cols-3 gap-2">
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-muted">Б, г</span>
-              <input v-model="lowDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-            </label>
-            <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">Ж, г</span>
               <input v-model="lowDeltaFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
             <label class="flex flex-col gap-1">
               <span class="text-xs text-muted">У, г</span>
               <input v-model="lowDeltaCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-muted">Б, г</span>
+              <input v-model="lowDeltaProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
             </label>
           </div>
         </div>
@@ -550,22 +550,6 @@ async function saveGoals() {
       <template v-if="boundsEnabled">
         <div class="grid grid-cols-2 gap-2">
           <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Ккал, мин</span>
-            <input v-model="minKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Ккал, макс</span>
-            <input v-model="maxKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Белки, мин</span>
-            <input v-model="minProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">Белки, макс</span>
-            <input v-model="maxProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          </label>
-          <label class="flex flex-col gap-1">
             <span class="text-xs text-muted">Жиры, мин</span>
             <input v-model="minFatInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
           </label>
@@ -580,6 +564,22 @@ async function saveGoals() {
           <label class="flex flex-col gap-1">
             <span class="text-xs text-muted">Углеводы, макс</span>
             <input v-model="maxCarbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Белки, мин</span>
+            <input v-model="minProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Белки, макс</span>
+            <input v-model="maxProteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ккал, мин</span>
+            <input v-model="minKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-muted">Ккал, макс</span>
+            <input v-model="maxKcalInput" type="text" inputmode="decimal" class="rounded-2xl bg-bg border border-line px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
           </label>
         </div>
         <p class="text-xs text-muted">Каждая граница независима — можно задать только одну из восьми и не трогать остальные.</p>

@@ -36,8 +36,14 @@ function closeAll() {
   emit('close')
 }
 
+// Тап по полю очищает его (владелица: не стирать 42 руками перед вводом
+// нового числа); прежние граммы остаются подсказкой, и пока поле пустое —
+// считаем по ним же, «Сохранить» без ввода ничего не меняет.
 const gramsInput = ref(String(props.entry.grams))
-const grams = computed(() => parseDecimal(gramsInput.value) ?? 0)
+const grams = computed(() => parseDecimal(gramsInput.value) ?? props.entry.grams)
+function clearOnFocus() {
+  if (gramsInput.value === String(props.entry.grams)) gramsInput.value = ''
+}
 
 const per100 = computed(() => ({
   protein: props.entry.protein,
@@ -71,7 +77,7 @@ async function remove() {
         <div>
           <h2 class="text-base font-semibold text-ink">{{ withBrand(entry.name, entry.brand) }}</h2>
           <p class="text-xs text-muted">
-            на 100 г: Б {{ per100.protein }} · Ж {{ per100.fat }} · У {{ per100.carbs }} · {{ Math.round(per100.kcal) }} ккал
+            на 100 г: Ж {{ per100.fat }} · У {{ per100.carbs }} · Б {{ per100.protein }} · {{ Math.round(per100.kcal) }} ккал
           </p>
         </div>
         <button
@@ -91,13 +97,15 @@ async function remove() {
           type="text"
           inputmode="decimal"
           autofocus
+          :placeholder="String(entry.grams)"
+          @focus="clearOnFocus"
           class="flex-1 text-2xl font-semibold text-ink bg-transparent outline-none"
         />
         <span class="text-sm text-muted">г</span>
       </div>
 
       <p class="text-sm text-muted">
-        Б {{ scaled.protein.toFixed(1) }} · Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} ·
+        Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} · Б {{ scaled.protein.toFixed(1) }} ·
         {{ Math.round(scaled.kcal) }} ккал
       </p>
 

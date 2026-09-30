@@ -77,7 +77,7 @@ function onFoodDeleted() {
             {{ item.name }}
           </h2>
           <p class="text-xs text-muted">
-            на 100 г: Б {{ per100.protein }} · Ж {{ per100.fat }} · У {{ per100.carbs }} · {{ Math.round(per100.kcal) }} ккал
+            на 100 г: Ж {{ per100.fat }} · У {{ per100.carbs }} · Б {{ per100.protein }} · {{ Math.round(per100.kcal) }} ккал
           </p>
         </div>
         <!-- Свой продукт — правка; продукт из базы — «моя версия» (этап 2.6) -->
@@ -104,7 +104,7 @@ function onFoodDeleted() {
       </div>
 
       <p class="text-sm text-muted">
-        Б {{ scaled.protein.toFixed(1) }} · Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} ·
+        Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} · Б {{ scaled.protein.toFixed(1) }} ·
         {{ Math.round(scaled.kcal) }} ккал
       </p>
 
