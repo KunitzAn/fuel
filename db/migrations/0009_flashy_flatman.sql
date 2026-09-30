@@ -1,0 +1,1 @@
+ALTER TABLE "entries" ADD COLUMN "treat" boolean DEFAULT false NOT NULL;

@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { capitalizeFirst, formatDateWithWeekday, formatDayShort } from '../lib/date'
 import { periodAverages, statsPeriod, type DaySummary, type StatsPeriodKind } from '../lib/stats'
+import { TREAT_ICON, TREAT_LABEL } from '../lib/treat'
 import StatsBarChart, { type ChartBar } from './StatsBarChart.vue'
 
 const props = defineProps<{
@@ -166,6 +167,12 @@ const axis = computed(() => {
             <p class="text-sm font-semibold text-ink">{{ int(averages.eaten!.protein) }}</p>
           </div>
         </div>
+        <p v-if="averages.treat && averages.treat.kcal > 0" class="mt-3 text-xs text-muted">
+          {{ TREAT_ICON }} {{ TREAT_LABEL }} в среднем: {{ int(averages.treat.kcal) }} ккал в день
+          ({{ Math.round((averages.treat.kcal / averages.eaten!.kcal) * 100) }}%) · Ж {{ int(averages.treat.fat) }} · У
+          {{ int(averages.treat.carbs) }} · Б {{ int(averages.treat.protein) }}; основная еда —
+          {{ int(averages.eaten!.kcal - averages.treat.kcal) }} ккал
+        </p>
         <p v-if="averages.totalDifferenceKcal !== null" class="mt-3 pt-3 border-t border-line text-sm text-ink flex justify-between">
           <span>Итого разница за период</span>
           <span class="font-semibold tabular-nums">{{ signed(averages.totalDifferenceKcal) }} ккал</span>

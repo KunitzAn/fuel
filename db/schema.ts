@@ -294,6 +294,9 @@ export const entries = pgTable(
     carbs: real('carbs').notNull(),
     kcal: real('kcal').notNull(),
     grams: real('grams').notNull(),
+    // «Лакомство» (владелица, после этапа 6): отметка на конкретной записи —
+    // считать отдельно, сколько КБЖУ уходит на основную еду, а сколько нет
+    treat: boolean('treat').notNull().default(false),
     ...syncColumns,
   },
   (t) => [index('entries_user_sync_idx').on(t.userId, t.serverUpdatedAt)],

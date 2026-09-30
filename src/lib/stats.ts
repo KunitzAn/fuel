@@ -16,7 +16,7 @@ import {
 import { scaleByGrams, sumMacros, type Macros } from './nutrition'
 
 export interface StatsSource {
-  entries: Pick<Entry, 'date' | 'protein' | 'fat' | 'carbs' | 'kcal' | 'grams'>[]
+  entries: Pick<Entry, 'date' | 'protein' | 'fat' | 'carbs' | 'kcal' | 'grams' | 'treat'>[]
   activities: Pick<Activity, 'date' | 'kcal'>[]
   health: Pick<DailyActiveEnergy, 'date' | 'totalActiveKcal'>[]
   goalSettings: GoalSettings[]
@@ -26,6 +26,8 @@ export interface DaySummary {
   date: string
   hasEntries: boolean
   eaten: Macros
+  /** Из съеденного — отмеченное как не основная еда (lib/treat.ts). */
+  treat: Macros
   /** Цель того дня («Факт») — по версии настроек того дня, с прибавкой за тренировки. */
   goal: DayGoal | null
   /** Покой + активность; без цели покоя не знаем — `null`. */
@@ -54,6 +56,7 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
   return (date) => {
     const dayEntries = entriesByDate.get(date) ?? []
     const eaten = sumMacros(dayEntries.map((e) => scaleByGrams(e, e.grams)))
+    const treat = sumMacros(dayEntries.filter((e) => e.treat === true).map((e) => scaleByGrams(e, e.grams)))
     const settings = pickGoalSettingsForDate(source.goalSettings, date)
     const activity = dayActivity(activitiesByDate.get(date) ?? [], healthByDate.get(date) ?? null)
     // Статистика — всегда «Факт» (владелица): цель с прибавкой за
@@ -64,6 +67,7 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
       date,
       hasEntries: dayEntries.length > 0,
       eaten,
+      treat,
       goal,
       spentKcal,
       differenceKcal: spentKcal === null ? null : eaten.kcal - spentKcal,
@@ -122,6 +126,8 @@ export interface PeriodAverages {
   /** Сколько дней вошло: есть записи и день уже закончился (не сегодня/будущее). */
   days: number
   eaten: Macros | null
+  /** Средняя доля «не основной» еды в день — из тех же дней, что и `eaten`. */
+  treat: Macros | null
   spentKcal: number | null
   differenceKcal: number | null
   /** Сумма разниц за вошедшие дни — README «итого разница за период». */
@@ -137,9 +143,10 @@ export interface PeriodAverages {
 export function periodAverages(summaries: DaySummary[], today: string): PeriodAverages {
   const counted = summaries.filter((s) => s.hasEntries && s.date < today)
   if (counted.length === 0) {
-    return { days: 0, eaten: null, spentKcal: null, differenceKcal: null, totalDifferenceKcal: null }
+    return { days: 0, eaten: null, treat: null, spentKcal: null, differenceKcal: null, totalDifferenceKcal: null }
   }
   const total = sumMacros(counted.map((s) => s.eaten))
+  const treatTotal = sumMacros(counted.map((s) => s.treat))
   const n = counted.length
   const withSpent = counted.filter((s) => s.spentKcal !== null)
   const spentSum = withSpent.reduce((sum, s) => sum + s.spentKcal!, 0)
@@ -147,6 +154,7 @@ export function periodAverages(summaries: DaySummary[], today: string): PeriodAv
   return {
     days: n,
     eaten: { protein: total.protein / n, fat: total.fat / n, carbs: total.carbs / n, kcal: total.kcal / n },
+    treat: { protein: treatTotal.protein / n, fat: treatTotal.fat / n, carbs: treatTotal.carbs / n, kcal: treatTotal.kcal / n },
     spentKcal: withSpent.length ? spentSum / withSpent.length : null,
     differenceKcal: withSpent.length ? diffSum / withSpent.length : null,
     totalDifferenceKcal: withSpent.length ? diffSum : null,

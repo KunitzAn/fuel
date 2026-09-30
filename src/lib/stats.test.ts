@@ -39,7 +39,7 @@ const food = { protein: 10, fat: 5, carbs: 50, kcal: 305 }
 const source: StatsSource = {
   entries: [
     { date: '2026-09-21', ...food, grams: 200 },
-    { date: '2026-09-21', ...food, grams: 100 },
+    { date: '2026-09-21', ...food, grams: 100, treat: true },
     { date: '2026-09-22', ...food, grams: 500 },
     { date: '2026-08-30', ...food, grams: 100 }, // до первой версии настроек
   ],
@@ -55,6 +55,7 @@ describe('createDaySummarizer', () => {
     const s = summarize('2026-09-21')
     expect(s.hasEntries).toBe(true)
     expect(s.eaten).toEqual({ protein: 30, fat: 15, carbs: 150, kcal: 915 })
+    expect(s.treat).toEqual({ protein: 10, fat: 5, carbs: 50, kcal: 305 }) // только отмеченная запись
     expect(s.goal!.carbs).toBe(220) // 200 + 200/100 × 10 — прибавка только от ручной тренировки, не от Здоровья
     expect(s.spentKcal).toBe(2000) // 1500 + 200 + 300
     expect(s.differenceKcal).toBe(-1085)
@@ -133,12 +134,14 @@ describe('periodAverages', () => {
     expect(avg.eaten!.kcal).toBe((305 + 915) / 2)
     expect(avg.spentKcal).toBe(2000) // только 21.09 — у 30.08 цели нет
     expect(avg.totalDifferenceKcal).toBe(-1085)
+    expect(avg.treat!.kcal).toBe(305 / 2)
   })
 
   it('ни одного дня — всё null', () => {
     expect(periodAverages([summarize('2026-09-23')], '2026-09-30')).toEqual({
       days: 0,
       eaten: null,
+      treat: null,
       spentKcal: null,
       differenceKcal: null,
       totalDifferenceKcal: null,

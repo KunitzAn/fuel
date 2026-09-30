@@ -22,6 +22,7 @@ import {
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { statusTextClass } from '../lib/statusColors'
+import { TREAT_ICON, TREAT_LABEL } from '../lib/treat'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner']
@@ -104,6 +105,9 @@ function pickFact(kind: DayTypeKind | null) {
 const dayEntries = computed(() => allEntries.value.filter((e) => e.date === date.value).sort(byCreatedAt))
 const dayTotals = computed(() =>
   sumMacros(dayEntries.value.map((e) => scaleByGrams(e, e.grams))),
+)
+const dayTreat = computed(() =>
+  sumMacros(dayEntries.value.filter((e) => e.treat === true).map((e) => scaleByGrams(e, e.grams))),
 )
 
 // Цвет цифр в плашке — общее правило с статистикой (goals.ts →
@@ -277,27 +281,32 @@ onBeforeRouteLeave((to) => {
         <div>
           <p class="text-[11px] text-muted">Ж</p>
           <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.fat)">
-            {{ dayTotals.fat.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.fat) }}<span v-if="dayGoal.fatChanged">⚡</span></template>
+            {{ dayTotals.fat.toFixed(1) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.fat) }}<span v-if="dayGoal.fatChanged">⚡</span></span>
           </p>
         </div>
         <div>
           <p class="text-[11px] text-muted">У</p>
           <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.carbs)">
-            {{ dayTotals.carbs.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.carbs) }}<span v-if="dayGoal.carbsChanged">⚡</span></template>
+            {{ dayTotals.carbs.toFixed(1) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.carbs) }}<span v-if="dayGoal.carbsChanged">⚡</span></span>
           </p>
         </div>
         <div>
           <p class="text-[11px] text-muted">Б</p>
           <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.protein)">
-            {{ dayTotals.protein.toFixed(1) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.protein) }}<span v-if="dayGoal.proteinChanged">⚡</span></template>
+            {{ dayTotals.protein.toFixed(1) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.protein) }}<span v-if="dayGoal.proteinChanged">⚡</span></span>
           </p>
         </div>
         <div>
           <p class="text-[11px] text-muted">Ккал</p>
           <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.kcal)">
-            {{ Math.round(dayTotals.kcal) }}<template v-if="dayGoal">/{{ Math.round(dayGoal.kcal) }}</template>
+            {{ Math.round(dayTotals.kcal) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.kcal) }}</span>
           </p>
         </div>
+        <!-- Сколько из съеденного — «не основная» еда (lib/treat.ts) -->
+        <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-2 text-xs text-muted">
+          {{ TREAT_ICON }} {{ TREAT_LABEL }}: {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
+          Ж {{ dayTreat.fat.toFixed(1) }} · У {{ dayTreat.carbs.toFixed(1) }} · Б {{ dayTreat.protein.toFixed(1) }}
+        </p>
       </div>
 
     </div>

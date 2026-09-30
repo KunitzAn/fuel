@@ -55,6 +55,7 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
     carbs: item.carbs,
     kcal: item.kcal,
     grams,
+    treat: false,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -66,9 +67,9 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
   void runSync()
 }
 
-export async function updateEntryGrams(id: string, grams: number): Promise<void> {
+export async function updateEntryGrams(id: string, grams: number, treat?: boolean): Promise<void> {
   const now = new Date().toISOString()
-  await db.entries.update(id, { grams, updatedAt: now, dirty: true })
+  await db.entries.update(id, { grams, ...(treat === undefined ? {} : { treat }), updatedAt: now, dirty: true })
   void runSync()
 }
 

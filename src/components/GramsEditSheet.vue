@@ -6,6 +6,7 @@ import { Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import FoodFormSheet from './FoodFormSheet.vue'
 import { withBrand } from '../lib/pick'
+import { TREAT_ICON, TREAT_LABEL } from '../lib/treat'
 import { db, type Entry, type Food } from '../lib/db'
 import { softDeleteEntry, updateEntryGrams } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
@@ -53,9 +54,12 @@ const per100 = computed(() => ({
 }))
 const scaled = computed(() => scaleByGrams(per100.value, grams.value))
 
+// Отметка «не основная еда» (lib/treat.ts) — сохраняется той же кнопкой
+const treat = ref(props.entry.treat === true)
+
 async function save() {
   if (grams.value <= 0) return
-  await updateEntryGrams(props.entry.id, grams.value)
+  await updateEntryGrams(props.entry.id, grams.value, treat.value)
   emit('close')
 }
 
@@ -108,6 +112,11 @@ async function remove() {
         Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} · Б {{ scaled.protein.toFixed(1) }} ·
         {{ Math.round(scaled.kcal) }} ккал
       </p>
+
+      <label class="flex items-center gap-2 text-sm text-ink">
+        <input v-model="treat" type="checkbox" class="h-4 w-4 accent-accent shrink-0" />
+        {{ TREAT_ICON }} {{ TREAT_LABEL }}
+      </label>
 
       <div class="flex gap-2">
         <button

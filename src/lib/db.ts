@@ -45,6 +45,8 @@ export interface Entry {
   carbs: number
   kcal: number
   grams: number
+  /** «Лакомство» — не основная еда; у старых локальных строк может не быть. */
+  treat?: boolean
   createdAt: string // порядок в дне и в «Истории»
   updatedAt: string
   deletedAt: string | null
