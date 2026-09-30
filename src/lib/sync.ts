@@ -25,6 +25,39 @@ const PUSH_CHUNK_SIZE = 300
 export const syncing = ref(false)
 export const lastSyncError = ref<string | null>(null)
 export const pendingCount = ref(0)
+/**
+ * Итог последнего синка — для диагностики в Настройках (владелица:
+ * «почему так долго висит "Ждут отправки"»): сколько строк ушло, сколько
+ * сервер принял, сколько отклонил и прислал свою версию.
+ */
+export const lastSyncReport = ref<{ at: string; sent: number; accepted: number; taken: number } | null>(null)
+
+export interface PendingRow {
+  table: string
+  label: string
+  updatedAt: string
+}
+
+/** Что именно ждёт отправки — список в Настройках. */
+export async function listPendingRows(): Promise<PendingRow[]> {
+  const [foods, snacks, entries, activities, goalSettings, dayTypes] = await Promise.all([
+    db.foods.filter((r) => r.dirty).toArray(),
+    db.snacks.filter((r) => r.dirty).toArray(),
+    db.entries.filter((r) => r.dirty).toArray(),
+    db.activities.filter((r) => r.dirty).toArray(),
+    db.goalSettings.filter((r) => r.dirty).toArray(),
+    db.dayTypes.filter((r) => r.dirty).toArray(),
+  ])
+  const del = (d: string | null) => (d ? ' (удалено)' : '')
+  return [
+    ...foods.map((r) => ({ table: 'Продукт', label: r.name + del(r.deletedAt), updatedAt: r.updatedAt })),
+    ...snacks.map((r) => ({ table: 'Перекус', label: `${r.name}, ${r.date}` + del(r.deletedAt), updatedAt: r.updatedAt })),
+    ...entries.map((r) => ({ table: 'Запись', label: `${r.name}, ${r.date}` + del(r.deletedAt), updatedAt: r.updatedAt })),
+    ...activities.map((r) => ({ table: 'Активность', label: `${r.name ?? ''}, ${r.date}` + del(r.deletedAt), updatedAt: r.updatedAt })),
+    ...goalSettings.map((r) => ({ table: 'Настройки', label: `с ${r.validFrom}` + del(r.deletedAt), updatedAt: r.updatedAt })),
+    ...dayTypes.map((r) => ({ table: 'Тип дня', label: r.date, updatedAt: r.updatedAt })),
+  ].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+}
 
 interface SyncResponse {
   serverTime: string
@@ -321,6 +354,8 @@ async function runSyncOnce(): Promise<void> {
     const acceptedGoalSettings = new Set<string>()
     const acceptedDayTypes = new Set<string>()
     let latestServerTime = pulled.serverTime
+    let sent = 0
+    let taken = 0
 
     for (const chunk of chunkPush(dirtyFoods, dirtySnacks, dirtyEntries, dirtyActivities, dirtyGoalSettings, dirtyDayTypes)) {
       if (
@@ -332,6 +367,13 @@ async function runSyncOnce(): Promise<void> {
         !chunk.dayTypes.length
       )
         continue
+      sent +=
+        chunk.foods.length +
+        chunk.snacks.length +
+        chunk.entries.length +
+        chunk.activities.length +
+        chunk.goalSettings.length +
+        chunk.dayTypes.length
       const pushed = await api.post<PushResponse>('/api/sync', chunk)
       pushed.accepted.foods.forEach((id) => acceptedFoods.add(id))
       pushed.accepted.snacks.forEach((id) => acceptedSnacks.add(id))
@@ -339,7 +381,10 @@ async function runSyncOnce(): Promise<void> {
       pushed.accepted.activities.forEach((id) => acceptedActivities.add(id))
       pushed.accepted.goalSettings.forEach((id) => acceptedGoalSettings.add(id))
       pushed.accepted.dayTypes.forEach((date) => acceptedDayTypes.add(date))
-      if (pushed.current) await takeServerVersions(pushed.current)
+      if (pushed.current) {
+        await takeServerVersions(pushed.current)
+        taken += Object.values(pushed.current).reduce((n, rows) => n + rows.length, 0)
+      }
       latestServerTime = pushed.serverTime
     }
 
@@ -353,6 +398,18 @@ async function runSyncOnce(): Promise<void> {
     await setLastSyncedAt(latestServerTime)
     await db.settings.put({ key: SYNCED_USER_ID_KEY, value: String(session.userId) })
     await db.settings.put({ key: SYNC_SCHEMA_KEY, value: String(SYNC_SCHEMA) })
+    lastSyncReport.value = {
+      at: new Date().toISOString(),
+      sent,
+      accepted:
+        acceptedFoods.size +
+        acceptedSnacks.size +
+        acceptedEntries.size +
+        acceptedActivities.size +
+        acceptedGoalSettings.size +
+        acceptedDayTypes.size,
+      taken,
+    }
   } catch (err) {
     lastSyncError.value = err instanceof Error ? err.message : 'sync_failed'
   } finally {

@@ -9,7 +9,7 @@ import { saveGoalSettings } from '../lib/goalSettings'
 import { replacedVersionDates, type GoalSettingsRange } from '../lib/goalSettingsPlan'
 import { pickGoalSettingsForDate } from '../lib/goals'
 import { kcalFromMacros, parseDecimal } from '../lib/nutrition'
-import { lastSyncError, pendingCount, runSync, syncing } from '../lib/sync'
+import { lastSyncError, lastSyncReport, listPendingRows, pendingCount, runSync, syncing, type PendingRow } from '../lib/sync'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 // Если сессия уже известна — показываем сразу, не ждём сети (без неё на
@@ -290,6 +290,18 @@ const applyRange = computed<GoalSettingsRange | null>(() => {
 })
 const replacedDates = computed(() => (applyRange.value ? replacedVersionDates(goalRows.value, applyRange.value) : []))
 
+// Диагностика «Ждут отправки» — что именно висит и чем кончился синк
+const pendingOpen = ref(false)
+const pendingRows = ref<PendingRow[]>([])
+async function togglePending() {
+  pendingOpen.value = !pendingOpen.value
+  if (pendingOpen.value) pendingRows.value = await listPendingRows()
+}
+async function syncNow() {
+  await runSync()
+  pendingRows.value = await listPendingRows()
+}
+
 const kcalError = ref<string | null>(null)
 const goalsSavedJustNow = ref(false)
 async function saveGoals() {
@@ -367,7 +379,21 @@ async function saveGoals() {
           <template v-else-if="lastSyncError">Синк не удался, попробую снова</template>
           <template v-else-if="pendingCount > 0">Ждут отправки: {{ pendingCount }}</template>
           <template v-else>Синхронизировано</template>
+          <button v-if="pendingCount > 0 || lastSyncError" type="button" @click="togglePending" class="ml-1 text-accent underline underline-offset-2">
+            {{ pendingOpen ? 'скрыть' : 'подробнее' }}
+          </button>
         </p>
+        <div v-if="pendingOpen" class="mt-2 rounded-xl bg-bg border border-line p-3 text-xs text-muted flex flex-col gap-1.5">
+          <p v-if="lastSyncError">Ошибка: {{ lastSyncError }}</p>
+          <p v-if="lastSyncReport">
+            Последний синк в {{ formatTime(lastSyncReport.at) }}: отправлено {{ lastSyncReport.sent }}, сервер принял
+            {{ lastSyncReport.accepted }}, прислал свою версию {{ lastSyncReport.taken }}
+          </p>
+          <ul class="flex flex-col gap-0.5">
+            <li v-for="(r, i) in pendingRows" :key="i">{{ r.table }}: {{ r.label }} · изм. {{ r.updatedAt.slice(0, 16).replace('T', ' ') }}</li>
+          </ul>
+          <button type="button" @click="syncNow" class="self-start text-accent underline underline-offset-2">Отправить сейчас</button>
+        </div>
         <button
           type="button"
           @click="logout"

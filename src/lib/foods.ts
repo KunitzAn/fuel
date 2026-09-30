@@ -78,7 +78,9 @@ export async function softDeleteFood(id: string): Promise<void> {
 
 /** Граммы с прошлого раза — подстановка в окно ввода при следующем добавлении. */
 export async function rememberLastGrams(foodId: string, grams: number): Promise<void> {
-  await db.foods.update(foodId, { lastGrams: grams, dirty: true })
+  // updatedAt тоже двигаем: без него правка уходила со старым временем и
+  // сервер (LWW) мог её отклонить, если его версия новее
+  await db.foods.update(foodId, { lastGrams: grams, updatedAt: new Date().toISOString(), dirty: true })
   void runSync()
 }
 
