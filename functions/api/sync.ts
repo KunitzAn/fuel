@@ -523,6 +523,23 @@ async function upsertSnacks(db: Db, userId: number, rows: WireSnack[]): Promise<
 
 async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise<string[]> {
   if (rows.length === 0) return []
+  // Ссылка на продукт/перекус, которого у этого пользователя на сервере
+  // нет (осталась в браузере от старых тестов — поймали у владелицы: 5
+  // удалённых записей за 25.09 валили весь POST по FK и держали «Ждут
+  // отправки»), — обнуляем: запись хранит свой снимок названия и КБЖУ,
+  // без ссылки она считается так же, а синк не падает целиком.
+  const foodRefs = [...new Set(rows.map((e) => e.foodId).filter((id): id is string => !!id))]
+  const snackRefs = [...new Set(rows.map((e) => e.snackId).filter((id): id is string => !!id))]
+  const [knownFoods, knownSnacks] = await Promise.all([
+    foodRefs.length
+      ? db.select({ id: foods.id }).from(foods).where(and(eq(foods.userId, userId), inArray(foods.id, foodRefs)))
+      : [],
+    snackRefs.length
+      ? db.select({ id: snacks.id }).from(snacks).where(and(eq(snacks.userId, userId), inArray(snacks.id, snackRefs)))
+      : [],
+  ])
+  const foodOk = new Set(knownFoods.map((r) => r.id))
+  const snackOk = new Set(knownSnacks.map((r) => r.id))
   const accepted = await db
     .insert(entries)
     .values(
@@ -531,8 +548,8 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
         userId,
         date: e.date,
         meal: e.meal,
-        snackId: e.snackId,
-        foodId: e.foodId,
+        snackId: e.snackId && snackOk.has(e.snackId) ? e.snackId : null,
+        foodId: e.foodId && foodOk.has(e.foodId) ? e.foodId : null,
         catalogId: e.catalogId,
         name: e.name,
         brand: e.brand,
