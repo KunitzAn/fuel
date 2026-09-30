@@ -1,4 +1,4 @@
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import { activities, dailyActiveEnergy, dayTypes, entries, foods, goalSettings, snacks } from '../../db/schema'
 import type { AuthedData } from '../_lib/context'
 import { getDb, type Db } from '../_lib/db'
@@ -180,106 +180,12 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
 
   return json({
     serverTime: new Date().toISOString(),
-    foods: foodRows.map((f) => ({
-      id: f.id,
-      kind: f.kind,
-      name: f.name,
-      brand: f.brand,
-      barcode: f.barcode,
-      protein: f.protein,
-      fat: f.fat,
-      carbs: f.carbs,
-      kcal: f.kcal,
-      note: f.note,
-      sourceCatalogId: f.sourceCatalogId,
-      lastGrams: f.lastGrams,
-      createdAt: f.createdAt.toISOString(),
-      updatedAt: f.updatedAt.toISOString(),
-      deletedAt: f.deletedAt?.toISOString() ?? null,
-    })),
-    snacks: snackRows.map((s) => ({
-      id: s.id,
-      date: s.date,
-      after: s.after,
-      name: s.name,
-      position: s.position,
-      createdAt: s.createdAt.toISOString(),
-      updatedAt: s.updatedAt.toISOString(),
-      deletedAt: s.deletedAt?.toISOString() ?? null,
-    })),
-    entries: entryRows.map((e) => ({
-      id: e.id,
-      date: e.date,
-      meal: e.meal,
-      snackId: e.snackId,
-      foodId: e.foodId,
-      catalogId: e.catalogId,
-      name: e.name,
-      brand: e.brand,
-      protein: e.protein,
-      fat: e.fat,
-      carbs: e.carbs,
-      kcal: e.kcal,
-      grams: e.grams,
-      createdAt: e.createdAt.toISOString(),
-      updatedAt: e.updatedAt.toISOString(),
-      deletedAt: e.deletedAt?.toISOString() ?? null,
-    })),
-    activities: activityRows.map((a) => ({
-      id: a.id,
-      date: a.date,
-      source: a.source,
-      name: a.name,
-      kcal: a.kcal,
-      totalKcal: a.totalKcal,
-      externalId: a.externalId,
-      startedAt: a.startedAt?.toISOString() ?? null,
-      durationMin: a.durationMin,
-      createdAt: a.createdAt.toISOString(),
-      updatedAt: a.updatedAt.toISOString(),
-      deletedAt: a.deletedAt?.toISOString() ?? null,
-    })),
-    goalSettings: goalSettingsRows.map((g) => ({
-      id: g.id,
-      validFrom: g.validFrom,
-      baseProtein: g.baseProtein,
-      baseFat: g.baseFat,
-      baseCarbs: g.baseCarbs,
-      restingKcal: g.restingKcal,
-      perHundredProtein: g.perHundredProtein,
-      perHundredFat: g.perHundredFat,
-      perHundredCarbs: g.perHundredCarbs,
-      highDeltaProtein: g.highDeltaProtein,
-      highDeltaFat: g.highDeltaFat,
-      highDeltaCarbs: g.highDeltaCarbs,
-      lowDeltaProtein: g.lowDeltaProtein,
-      lowDeltaFat: g.lowDeltaFat,
-      lowDeltaCarbs: g.lowDeltaCarbs,
-      minKcal: g.minKcal,
-      maxKcal: g.maxKcal,
-      minProtein: g.minProtein,
-      maxProtein: g.maxProtein,
-      minFat: g.minFat,
-      maxFat: g.maxFat,
-      minCarbs: g.minCarbs,
-      maxCarbs: g.maxCarbs,
-      maxFollowsActivity: g.maxFollowsActivity,
-      createdAt: g.createdAt.toISOString(),
-      updatedAt: g.updatedAt.toISOString(),
-      deletedAt: g.deletedAt?.toISOString() ?? null,
-    })),
-    dayTypes: dayTypeRows.map((d) => ({
-      date: d.date,
-      planned: d.planned,
-      plannedSource: d.plannedSource,
-      plannedDeltaProtein: d.plannedDeltaProtein,
-      plannedDeltaFat: d.plannedDeltaFat,
-      plannedDeltaCarbs: d.plannedDeltaCarbs,
-      actual: d.actual,
-      createdAt: d.createdAt.toISOString(),
-      updatedAt: d.updatedAt.toISOString(),
-      deletedAt: d.deletedAt?.toISOString() ?? null,
-    })),
+    foods: foodRows.map(wireFood),
+    snacks: snackRows.map(wireSnack),
+    entries: entryRows.map(wireEntry),
+    activities: activityRows.map(wireActivity),
+    goalSettings: goalSettingsRows.map(wireGoalSettings),
+    dayTypes: dayTypeRows.map(wireDayType),
     // Этап 5, не из README до реализации: read-only с клиента, пишет
     // только /api/health/workouts (Bearer-токен Команды) — своего push
     // для этой таблицы здесь, в POST-хендлере ниже, нет и не будет.
@@ -292,6 +198,126 @@ export const onRequestGet: PagesFunction<Env, string, AuthedData> = async (ctx) 
       deletedAt: r.deletedAt?.toISOString() ?? null,
     })),
   })
+}
+
+// Строки в том же виде, что отдаёт GET — ими же POST отвечает на
+// отклонённые правки (см. `current` ниже).
+function wireFood(f: typeof foods.$inferSelect) {
+  return {
+    id: f.id,
+    kind: f.kind,
+    name: f.name,
+    brand: f.brand,
+    barcode: f.barcode,
+    protein: f.protein,
+    fat: f.fat,
+    carbs: f.carbs,
+    kcal: f.kcal,
+    note: f.note,
+    sourceCatalogId: f.sourceCatalogId,
+    lastGrams: f.lastGrams,
+    createdAt: f.createdAt.toISOString(),
+    updatedAt: f.updatedAt.toISOString(),
+    deletedAt: f.deletedAt?.toISOString() ?? null,
+  }
+}
+
+function wireSnack(s: typeof snacks.$inferSelect) {
+  return {
+    id: s.id,
+    date: s.date,
+    after: s.after,
+    name: s.name,
+    position: s.position,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+    deletedAt: s.deletedAt?.toISOString() ?? null,
+  }
+}
+
+function wireEntry(e: typeof entries.$inferSelect) {
+  return {
+    id: e.id,
+    date: e.date,
+    meal: e.meal,
+    snackId: e.snackId,
+    foodId: e.foodId,
+    catalogId: e.catalogId,
+    name: e.name,
+    brand: e.brand,
+    protein: e.protein,
+    fat: e.fat,
+    carbs: e.carbs,
+    kcal: e.kcal,
+    grams: e.grams,
+    createdAt: e.createdAt.toISOString(),
+    updatedAt: e.updatedAt.toISOString(),
+    deletedAt: e.deletedAt?.toISOString() ?? null,
+  }
+}
+
+function wireActivity(a: typeof activities.$inferSelect) {
+  return {
+    id: a.id,
+    date: a.date,
+    source: a.source,
+    name: a.name,
+    kcal: a.kcal,
+    totalKcal: a.totalKcal,
+    externalId: a.externalId,
+    startedAt: a.startedAt?.toISOString() ?? null,
+    durationMin: a.durationMin,
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+    deletedAt: a.deletedAt?.toISOString() ?? null,
+  }
+}
+
+function wireGoalSettings(g: typeof goalSettings.$inferSelect) {
+  return {
+    id: g.id,
+    validFrom: g.validFrom,
+    baseProtein: g.baseProtein,
+    baseFat: g.baseFat,
+    baseCarbs: g.baseCarbs,
+    restingKcal: g.restingKcal,
+    perHundredProtein: g.perHundredProtein,
+    perHundredFat: g.perHundredFat,
+    perHundredCarbs: g.perHundredCarbs,
+    highDeltaProtein: g.highDeltaProtein,
+    highDeltaFat: g.highDeltaFat,
+    highDeltaCarbs: g.highDeltaCarbs,
+    lowDeltaProtein: g.lowDeltaProtein,
+    lowDeltaFat: g.lowDeltaFat,
+    lowDeltaCarbs: g.lowDeltaCarbs,
+    minKcal: g.minKcal,
+    maxKcal: g.maxKcal,
+    minProtein: g.minProtein,
+    maxProtein: g.maxProtein,
+    minFat: g.minFat,
+    maxFat: g.maxFat,
+    minCarbs: g.minCarbs,
+    maxCarbs: g.maxCarbs,
+    maxFollowsActivity: g.maxFollowsActivity,
+    createdAt: g.createdAt.toISOString(),
+    updatedAt: g.updatedAt.toISOString(),
+    deletedAt: g.deletedAt?.toISOString() ?? null,
+  }
+}
+
+function wireDayType(d: typeof dayTypes.$inferSelect) {
+  return {
+    date: d.date,
+    planned: d.planned,
+    plannedSource: d.plannedSource,
+    plannedDeltaProtein: d.plannedDeltaProtein,
+    plannedDeltaFat: d.plannedDeltaFat,
+    plannedDeltaCarbs: d.plannedDeltaCarbs,
+    actual: d.actual,
+    createdAt: d.createdAt.toISOString(),
+    updatedAt: d.updatedAt.toISOString(),
+    deletedAt: d.deletedAt?.toISOString() ?? null,
+  }
 }
 
 // POST /api/sync — принимает то, что клиент пометил dirty, и апсертит.
@@ -324,6 +350,36 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
   const acceptedGoalSettings = await upsertGoalSettings(db, userId, body.goalSettings ?? [])
   const acceptedDayTypes = await upsertDayTypes(db, userId, body.dayTypes ?? [])
 
+  // Отклонённые правки (на сервере версия новее — LWW) отдаём сразу
+  // целиком: иначе клиент так и держал бы их «ждущими отправки» вечно —
+  // курсор pull уже ушёл дальше, и свежую серверную версию он бы не
+  // получил никогда (поймали: «Ждут отправки: 23» у владелицы).
+  const rejectedIds = (sent: { id: string }[], accepted: string[]) => {
+    const ok = new Set(accepted)
+    return sent.map((r) => r.id).filter((id) => !ok.has(id))
+  }
+  const rejFoods = rejectedIds(body.foods ?? [], acceptedFoods)
+  const rejSnacks = rejectedIds(body.snacks ?? [], acceptedSnacks)
+  const rejEntries = rejectedIds(body.entries ?? [], acceptedEntries)
+  const rejActivities = rejectedIds(body.activities ?? [], acceptedActivities)
+  const rejGoalSettings = rejectedIds(body.goalSettings ?? [], acceptedGoalSettings)
+  const acceptedDates = new Set(acceptedDayTypes)
+  const rejDayTypes = (body.dayTypes ?? []).map((d) => d.date).filter((d) => !acceptedDates.has(d))
+  const [curFoods, curSnacks, curEntries, curActivities, curGoalSettings, curDayTypes] = await Promise.all([
+    rejFoods.length ? db.select().from(foods).where(and(eq(foods.userId, userId), inArray(foods.id, rejFoods))) : [],
+    rejSnacks.length ? db.select().from(snacks).where(and(eq(snacks.userId, userId), inArray(snacks.id, rejSnacks))) : [],
+    rejEntries.length ? db.select().from(entries).where(and(eq(entries.userId, userId), inArray(entries.id, rejEntries))) : [],
+    rejActivities.length
+      ? db.select().from(activities).where(and(eq(activities.userId, userId), inArray(activities.id, rejActivities)))
+      : [],
+    rejGoalSettings.length
+      ? db.select().from(goalSettings).where(and(eq(goalSettings.userId, userId), inArray(goalSettings.id, rejGoalSettings)))
+      : [],
+    rejDayTypes.length
+      ? db.select().from(dayTypes).where(and(eq(dayTypes.userId, userId), inArray(dayTypes.date, rejDayTypes)))
+      : [],
+  ])
+
   return json({
     serverTime: new Date().toISOString(),
     accepted: {
@@ -333,6 +389,14 @@ export const onRequestPost: PagesFunction<Env, string, AuthedData> = async (ctx)
       activities: acceptedActivities,
       goalSettings: acceptedGoalSettings,
       dayTypes: acceptedDayTypes,
+    },
+    current: {
+      foods: curFoods.map(wireFood),
+      snacks: curSnacks.map(wireSnack),
+      entries: curEntries.map(wireEntry),
+      activities: curActivities.map(wireActivity),
+      goalSettings: curGoalSettings.map(wireGoalSettings),
+      dayTypes: curDayTypes.map(wireDayType),
     },
   })
 }

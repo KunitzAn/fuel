@@ -49,6 +49,8 @@ interface PushResponse {
     goalSettings: string[]
     dayTypes: string[]
   }
+  /** Свежие серверные версии отклонённых правок (на сервере новее). */
+  current?: Omit<SyncResponse, 'serverTime' | 'dailyActiveEnergy'>
 }
 
 async function getLastSyncedAt(): Promise<string | null> {
@@ -107,6 +109,21 @@ function shouldTake(local: { updatedAt: string; dirty: boolean } | undefined, re
   const remoteTime = new Date(remote.updatedAt).getTime()
   if (localTime < remoteTime) return true
   return fullRefresh && !local.dirty && localTime === remoteTime
+}
+
+/**
+ * Правку отклонил сервер — у него версия новее (LWW). Берём её как есть и
+ * снимаем dirty: курсор pull уже ушёл дальше, сама она больше не приедет.
+ */
+async function takeServerVersions(current: NonNullable<PushResponse['current']>): Promise<void> {
+  await db.transaction('rw', [db.foods, db.snacks, db.entries, db.activities, db.goalSettings, db.dayTypes], async () => {
+    for (const r of current.foods) await db.foods.put({ ...r, dirty: false })
+    for (const r of current.snacks) await db.snacks.put({ ...r, dirty: false })
+    for (const r of current.entries) await db.entries.put({ ...r, dirty: false })
+    for (const r of current.activities) await db.activities.put({ ...r, dirty: false })
+    for (const r of current.goalSettings) await db.goalSettings.put({ ...r, dirty: false })
+    for (const r of current.dayTypes) await db.dayTypes.put({ ...r, dirty: false })
+  })
 }
 
 async function mergePulled(res: SyncResponse, fullRefresh: boolean): Promise<void> {
@@ -240,10 +257,24 @@ async function updatePendingCount(): Promise<void> {
  * ТОГО ЖЕ промиса, что и уже идущий синк, а не резолвятся вникуда.
  */
 let inFlight: Promise<void> | null = null
+// Вызов, заставший идущий синк, не должен теряться: правка, сохранённая
+// после того, как текущий синк уже собрал «грязные» строки, иначе ждала
+// бы следующего повода (переключение вкладки, сеть) — так у владелицы
+// новая версия целей висела неотправленной. Такой вызов ставит флаг, и
+// сразу после текущего синка идёт ещё один; ждущие получают общий промис.
+let rerunRequested = false
 
 export function runSync(): Promise<void> {
-  if (inFlight) return inFlight
-  inFlight = runSyncOnce().finally(() => {
+  if (inFlight) {
+    rerunRequested = true
+    return inFlight
+  }
+  inFlight = (async () => {
+    do {
+      rerunRequested = false
+      await runSyncOnce()
+    } while (rerunRequested)
+  })().finally(() => {
     inFlight = null
   })
   return inFlight
@@ -308,6 +339,7 @@ async function runSyncOnce(): Promise<void> {
       pushed.accepted.activities.forEach((id) => acceptedActivities.add(id))
       pushed.accepted.goalSettings.forEach((id) => acceptedGoalSettings.add(id))
       pushed.accepted.dayTypes.forEach((date) => acceptedDayTypes.add(date))
+      if (pushed.current) await takeServerVersions(pushed.current)
       latestServerTime = pushed.serverTime
     }
 
