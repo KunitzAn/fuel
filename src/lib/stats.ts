@@ -1,16 +1,14 @@
 /**
  * Статистика (этап 6, README «Статистика»): сводка по дню для ленты и
- * графиков, периоды и средние. Цель, «потрачено» и цвет дня — теми же
- * функциями, что и дневник (goals.ts), чтобы лента не разошлась с ним.
+ * графиков, периоды и средние. Цель и «потрачено» — теми же функциями,
+ * что и дневник (goals.ts), чтобы лента не разошлась с ним.
  */
 import { addMonths, daysInMonth, shiftDate, toDateString, weekDates, type Month } from './date'
 import type { Activity, DailyActiveEnergy, Entry, GoalSettings } from './db'
 import {
   computeDayGoal,
   dayActivity,
-  displayDayStatus,
   pickGoalSettingsForDate,
-  type DayBoundsStatus,
   type DayGoal,
 } from './goals'
 import { scaleByGrams, sumMacros, type Macros } from './nutrition'
@@ -34,7 +32,6 @@ export interface DaySummary {
   spentKcal: number | null
   /** Съедено − потрачено (минус — дефицит). */
   differenceKcal: number | null
-  status: DayBoundsStatus
 }
 
 function groupByDate<T extends { date: string }>(rows: T[]): Map<string, T[]> {
@@ -71,7 +68,6 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
       goal,
       spentKcal,
       differenceKcal: spentKcal === null ? null : eaten.kcal - spentKcal,
-      status: displayDayStatus(settings, eaten, activity, goal),
     }
   }
 }

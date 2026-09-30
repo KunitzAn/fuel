@@ -42,9 +42,11 @@ function runShortcut() {
 </script>
 
 <template>
-  <section class="rounded-2xl bg-card border border-line overflow-hidden">
+  <section class="rounded-3xl glass glow overflow-hidden" style="--glow: var(--activity); --card-color: var(--activity)">
     <div class="flex items-center gap-2 px-4 pt-3">
-      <Flame :size="16" class="text-accent shrink-0" />
+      <span class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-(--card-color)/15">
+        <Flame :size="16" class="text-(--card-color)" />
+      </span>
       <h3 v-if="goal" class="text-sm text-ink flex-1">
         Потрачено {{ Math.round(goal.spentKcal) }} · Разница {{ differenceLabel }}
       </h3>
@@ -66,7 +68,7 @@ function runShortcut() {
 
     <p v-if="!healthConnected" class="px-4 pb-2.5 -mt-1 text-xs text-muted">
       Активность из Здоровья приходит только через Команду iOS —
-      <RouterLink to="/settings" class="text-accent underline underline-offset-2">как подключить</RouterLink>.
+      <RouterLink to="/settings" class="text-(--card-color) underline underline-offset-2">как подключить</RouterLink>.
       Без неё добавляйте вручную.
     </p>
 
@@ -95,7 +97,7 @@ function runShortcut() {
           </span>
         </li>
       </ul>
-      <button type="button" @click="editingActivity = 'new'" class="w-full text-left px-4 py-2.5 text-sm text-accent border-t border-line">
+      <button type="button" @click="editingActivity = 'new'" class="w-full text-left px-4 py-2.5 text-sm text-(--card-color) border-t border-line">
         + активность
       </button>
     </template>

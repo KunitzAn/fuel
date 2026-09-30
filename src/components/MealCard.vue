@@ -15,6 +15,8 @@ const props = defineProps<{
 }>()
 
 const MEAL_ICON = { breakfast: Sunrise, lunch: Sun, dinner: Sunset }
+// Этап 8: у каждого приёма свой цвет — пятно в углу, иконка, «+»
+const MEAL_COLOR = { breakfast: 'var(--breakfast)', lunch: 'var(--lunch)', dinner: 'var(--dinner)' }
 
 const expanded = ref(false)
 
@@ -32,21 +34,23 @@ function addSnack() {
 <template>
   <!-- overflow-clip, а не hidden: hidden делает карточку контейнером
        прокрутки, и прилипающая шапка ниже перестала бы липнуть к экрану -->
-  <section class="rounded-2xl bg-card border border-line overflow-clip">
+  <section class="rounded-3xl glass glow overflow-clip" :style="{ '--glow': MEAL_COLOR[meal], '--card-color': MEAL_COLOR[meal] }">
     <!-- Раскрытый приём прилипает шапкой под итогами дня, пока его список
          на экране (владелица: «если в нём много продуктов») -->
     <div
-      :class="expanded ? 'sticky z-10 bg-card' : ''"
+      :class="expanded ? 'sticky z-10 bg-card-solid glow border-b border-line' : ''"
       style="top: calc(env(safe-area-inset-top) + var(--day-header-h, 0px))"
     >
       <div class="flex items-center gap-2 px-4 pt-3">
-        <component :is="MEAL_ICON[meal]" :size="16" class="text-accent shrink-0" />
+        <span class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-(--card-color)/15">
+          <component :is="MEAL_ICON[meal]" :size="16" class="text-(--card-color)" />
+        </span>
         <h3 class="text-sm font-semibold text-ink flex-1">{{ MEAL_LABELS[meal] }}</h3>
         <span class="text-sm text-muted">{{ Math.round(totals.kcal) }} ккал</span>
         <RouterLink
           :to="`/day/${date}/add/${meal}`"
           aria-label="Добавить"
-          class="w-7 h-7 rounded-full flex items-center justify-center text-accent"
+          class="w-7 h-7 rounded-full flex items-center justify-center text-(--card-color)"
         >
           <Plus :size="18" />
         </RouterLink>
@@ -77,7 +81,7 @@ function addSnack() {
       <button
         type="button"
         @click="addSnack"
-        class="w-full text-left px-4 py-2.5 text-sm text-accent border-t border-line"
+        class="w-full text-left px-4 py-2.5 text-sm text-(--card-color) border-t border-line"
       >
         + перекус после {{ MEAL_GENITIVE[meal] }}
       </button>

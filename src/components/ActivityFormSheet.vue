@@ -44,7 +44,7 @@ async function remove() {
           type="text"
           placeholder="Силовая, прогулка…"
           autofocus
-          class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+          class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
       </label>
 
@@ -54,7 +54,7 @@ async function remove() {
           v-model="kcalInput"
           type="text"
           inputmode="decimal"
-          class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+          class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
       </label>
 

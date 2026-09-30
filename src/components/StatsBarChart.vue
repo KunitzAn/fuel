@@ -1,17 +1,14 @@
 <script setup lang="ts">
 // Столбики по дням + чёрточка цели (README «Графики»). Своё SVG, без
 // библиотеки: 7–92 столбика, ничего интерактивнее тапа не нужно. Цвет
-// столбика — статус дня (lib/statusColors.ts), как в дневнике и ленте.
+// столбиков — цвет нутриента (этап 8), статусом больше не красим.
 // `diverging` — для разницы: ноль посередине, профицит вверх, дефицит вниз.
 import { computed } from 'vue'
-import type { BoundStatus } from '../lib/goals'
-import { statusFillClass } from '../lib/statusColors'
 
 export interface ChartBar {
   date: string
   value: number | null
   goal: number | null
-  status: BoundStatus | null
   today: boolean
 }
 
@@ -21,6 +18,8 @@ const props = defineProps<{
   selected: string | null
   diverging?: boolean
   heightClass?: string
+  /** Цвет столбиков — цвет нутриента (CSS-переменная). */
+  color?: string
 }>()
 const emit = defineEmits<{ select: [date: string] }>()
 
@@ -49,7 +48,7 @@ function barRect(b: ChartBar, i: number) {
 </script>
 
 <template>
-  <section class="rounded-2xl bg-card border border-line p-3">
+  <section class="rounded-2xl glass p-3">
     <div class="flex items-baseline justify-between mb-1.5">
       <h3 class="text-xs font-semibold text-ink">{{ title }}</h3>
       <span class="text-[10px] text-muted tabular-nums">{{ diverging ? '±' : '' }}{{ Math.round(scale / 1.08).toLocaleString('ru-RU') }}</span>
@@ -67,7 +66,8 @@ function barRect(b: ChartBar, i: number) {
         <rect
           v-if="b.value !== null"
           v-bind="barRect(b, i)"
-          :class="[diverging ? 'fill-muted' : statusFillClass(b.status), b.today ? 'opacity-40' : '']"
+          :class="b.today ? 'opacity-40' : ''"
+          :style="{ fill: color ?? 'var(--muted)' }"
         />
         <line
           v-if="b.goal !== null && !diverging"

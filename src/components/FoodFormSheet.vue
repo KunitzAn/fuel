@@ -155,15 +155,15 @@ function onBarcodeScanned(code: string) {
       </p>
       <label class="flex flex-col gap-1">
         <span class="text-xs text-muted">Название*</span>
-        <input v-model="name" type="text" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+        <input v-model="name" type="text" class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
       </label>
 
 
       <label v-if="kind === 'product'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Штрихкод</span>
         <div class="flex gap-2">
-          <input v-model="barcode" type="text" inputmode="numeric" class="flex-1 rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
-          <button type="button" aria-label="Сканировать штрихкод" @click="scanningBarcode = true" class="w-11 h-11 rounded-2xl bg-card border border-line flex items-center justify-center text-ink shrink-0">
+          <input v-model="barcode" type="text" inputmode="numeric" class="flex-1 rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <button type="button" aria-label="Сканировать штрихкод" @click="scanningBarcode = true" class="w-11 h-11 rounded-2xl glass flex items-center justify-center text-ink shrink-0">
             <ScanLine :size="18" />
           </button>
         </div>
@@ -186,7 +186,7 @@ function onBarcodeScanned(code: string) {
           type="text"
           inputmode="decimal"
           placeholder="Граммы порции"
-          class="mt-1 rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+          class="mt-1 rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
       </div>
 
@@ -195,15 +195,15 @@ function onBarcodeScanned(code: string) {
       <div class="grid grid-cols-3 gap-2">
         <label class="flex flex-col gap-1">
           <span class="text-xs text-muted">Белки*</span>
-          <input v-model="proteinInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <input v-model="proteinInput" type="text" inputmode="decimal" class="rounded-2xl glass px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-xs text-muted">Жиры*</span>
-          <input v-model="fatInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <input v-model="fatInput" type="text" inputmode="decimal" class="rounded-2xl glass px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-xs text-muted">Углеводы*</span>
-          <input v-model="carbsInput" type="text" inputmode="decimal" class="rounded-2xl bg-card border border-line px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <input v-model="carbsInput" type="text" inputmode="decimal" class="rounded-2xl glass px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
         </label>
       </div>
       <p v-if="exceeds100" class="text-xs text-amber-600">Б + Ж + У получается больше 100 г на 100 г — проверьте, не опечатка ли</p>
@@ -211,7 +211,7 @@ function onBarcodeScanned(code: string) {
       <div class="flex items-end gap-2">
         <label class="flex-1 flex flex-col gap-1">
           <span class="text-xs text-muted">Ккал</span>
-          <input v-model="kcalInput" type="text" inputmode="decimal" :placeholder="String(Math.round(computedKcal))" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <input v-model="kcalInput" type="text" inputmode="decimal" :placeholder="String(Math.round(computedKcal))" class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
         </label>
         <button type="button" @click="fillKcalFromMacros" class="rounded-2xl border border-line px-3 py-3 text-xs text-ink shrink-0">
           = из БЖУ
@@ -221,7 +221,7 @@ function onBarcodeScanned(code: string) {
 
       <label v-if="kind === 'dish'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Заметка (из чего и в каких пропорциях — в расчётах не участвует)</span>
-        <textarea v-model="note" rows="3" class="rounded-2xl bg-card border border-line px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent resize-none" />
+        <textarea v-model="note" rows="3" class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent resize-none" />
       </label>
 
       <label v-if="isEdit" class="flex items-start gap-2">

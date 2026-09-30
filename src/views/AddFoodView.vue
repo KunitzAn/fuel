@@ -271,9 +271,9 @@ function titleFor(item: PickItem): string {
           v-model="query"
           type="text"
           placeholder="Поиск…"
-          class="flex-1 rounded-2xl bg-card border border-line px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+          class="flex-1 rounded-2xl glass px-4 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
-        <button type="button" aria-label="Сканировать штрихкод" @click="scanning = true" class="w-10 h-10 rounded-2xl bg-card border border-line flex items-center justify-center text-ink shrink-0">
+        <button type="button" aria-label="Сканировать штрихкод" @click="scanning = true" class="w-10 h-10 rounded-2xl glass flex items-center justify-center text-ink shrink-0">
           <ScanLine :size="18" />
         </button>
       </div>
@@ -292,7 +292,7 @@ function titleFor(item: PickItem): string {
       <template v-if="searching">
         <template v-if="searchBlocks.history.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">История</h3>
-          <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
+          <div class="rounded-2xl glass overflow-hidden mb-4">
             <FoodListRow
               v-for="row in searchBlocks.history"
               :key="row.item.key"
@@ -305,20 +305,20 @@ function titleFor(item: PickItem): string {
         </template>
         <template v-if="searchBlocks.products.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Продукты</h3>
-          <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
+          <div class="rounded-2xl glass overflow-hidden mb-4">
             <FoodListRow v-for="item in searchBlocks.products" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <template v-if="searchBlocks.dishes.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">Блюда</h3>
-          <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
+          <div class="rounded-2xl glass overflow-hidden mb-4">
             <FoodListRow v-for="item in searchBlocks.dishes" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
         <!-- База: без сети/входа блок не показываем (README), пока грузится — тихая подпись -->
         <template v-if="searchBlocks.catalog.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">База</h3>
-          <div class="rounded-2xl bg-card border border-line overflow-hidden mb-4">
+          <div class="rounded-2xl glass overflow-hidden mb-4">
             <FoodListRow v-for="item in searchBlocks.catalog" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
           </div>
         </template>
@@ -345,7 +345,7 @@ function titleFor(item: PickItem): string {
             {{ f.label }}
           </button>
         </div>
-        <div class="rounded-2xl bg-card border border-line overflow-hidden">
+        <div class="rounded-2xl glass overflow-hidden">
           <p v-if="historyRows.length === 0" class="px-4 py-3 text-sm text-muted">Пока пусто</p>
           <FoodListRow
             v-for="row in historyRows"
@@ -359,7 +359,7 @@ function titleFor(item: PickItem): string {
       </template>
 
       <template v-else-if="tab === 'products'">
-        <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
+        <div class="rounded-2xl glass overflow-hidden mb-3">
           <p v-if="productRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
           <FoodListRow v-for="item in productRows" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
@@ -367,7 +367,7 @@ function titleFor(item: PickItem): string {
       </template>
 
       <template v-else-if="tab === 'dishes'">
-        <div class="rounded-2xl bg-card border border-line overflow-hidden mb-3">
+        <div class="rounded-2xl glass overflow-hidden mb-3">
           <p v-if="dishRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
           <FoodListRow v-for="item in dishRows" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>

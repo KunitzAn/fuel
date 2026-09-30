@@ -44,11 +44,11 @@ function remove() {
 <template>
   <!-- overflow-clip, а не hidden: hidden делает карточку контейнером
        прокрутки, и прилипающая шапка ниже перестала бы липнуть к экрану -->
-  <section class="rounded-2xl bg-card border border-line overflow-clip">
+  <section class="rounded-3xl glass glow overflow-clip" style="--glow: var(--snack); --card-color: var(--snack)">
     <!-- Раскрытый приём прилипает шапкой под итогами дня, пока его список
          на экране (владелица: «если в нём много продуктов») -->
     <div
-      :class="expanded ? 'sticky z-10 bg-card' : ''"
+      :class="expanded ? 'sticky z-10 bg-card-solid glow border-b border-line' : ''"
       style="top: calc(env(safe-area-inset-top) + var(--day-header-h, 0px))"
     >
       <div class="flex items-center gap-2 px-4 pt-3">
@@ -59,7 +59,7 @@ function remove() {
           type="text"
           @blur="commitRename"
           @keyup.enter="commitRename"
-          class="flex-1 text-sm font-semibold text-ink bg-transparent outline-none border-b border-accent"
+          class="flex-1 text-sm font-semibold text-ink bg-transparent outline-none border-b border-(--card-color)"
         />
         <button v-else type="button" @click="startRename" class="text-sm font-semibold text-ink flex-1 text-left">
           {{ snack.name }}
@@ -76,7 +76,7 @@ function remove() {
         <RouterLink
           :to="`/day/${snack.date}/snack/${snack.id}/add`"
           aria-label="Добавить"
-          class="w-7 h-7 rounded-full flex items-center justify-center text-accent"
+          class="w-7 h-7 rounded-full flex items-center justify-center text-(--card-color)"
         >
           <Plus :size="18" />
         </RouterLink>

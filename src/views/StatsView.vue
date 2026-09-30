@@ -33,7 +33,7 @@ const earliest = computed(() => earliestEntryDate(entries.value))
   <main class="mx-auto max-w-md px-4 pb-24">
     <!-- Липкий верх целиком (заголовок, вкладки и шапка ленты) — так шапка
          ленты не уезжает под статус-бар iPhone и не нужно подбирать отступ -->
-    <div class="sticky top-0 z-10 bg-bg pt-[calc(env(safe-area-inset-top)+1rem)]">
+    <div class="sticky top-0 z-10 -mx-4 px-4 bg-bg/70 backdrop-blur-xl pt-[calc(env(safe-area-inset-top)+1rem)]">
       <h1 class="text-2xl font-bold">Статистика</h1>
       <div class="mt-3 flex gap-1 text-sm">
         <button type="button" @click="tab = 'feed'" class="flex-1 py-2 rounded-xl" :class="tab === 'feed' ? 'bg-accent text-white' : 'text-muted'">Лента</button>

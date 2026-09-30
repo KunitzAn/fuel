@@ -60,7 +60,6 @@ function barsFor(key: Key): ChartBar[] {
       // Цель — только у дней с записями: иначе до начала ведения дневника
       // тянется ряд одиноких чёрточек
       goal: s?.hasEntries && s.goal ? s.goal[key] : null,
-      status: s && s.hasEntries ? s.status[key] : null,
       today: date === props.today,
     }
   })
@@ -72,7 +71,6 @@ const differenceBars = computed<ChartBar[]>(() =>
       date,
       value: s && s.hasEntries ? s.differenceKcal : null,
       goal: null,
-      status: null,
       today: date === props.today,
     }
   }),
@@ -114,7 +112,7 @@ const axis = computed(() => {
         type="button"
         @click="kind = k.value"
         class="flex-1 py-1.5 rounded-xl"
-        :class="kind === k.value ? 'bg-card border border-line text-ink' : 'text-muted border border-transparent'"
+        :class="kind === k.value ? 'glass text-ink' : 'text-muted border border-transparent'"
       >
         {{ k.label }}
       </button>
@@ -136,7 +134,7 @@ const axis = computed(() => {
       </button>
     </div>
 
-    <section class="rounded-2xl bg-card border border-line p-4">
+    <section class="rounded-2xl glass p-4">
       <template v-if="averages.days > 0">
         <h3 class="text-xs text-muted mb-2">
           В среднем за день · {{ averages.days }} {{ daysWord(averages.days) }} с записями, без сегодняшнего
@@ -183,7 +181,7 @@ const axis = computed(() => {
     </section>
 
     <div class="min-h-10 text-xs">
-      <button v-if="selectedSummary" type="button" @click="router.push(`/day/${selected}`)" class="w-full text-left rounded-xl bg-card border border-line px-3 py-2">
+      <button v-if="selectedSummary" type="button" @click="router.push(`/day/${selected}`)" class="w-full text-left rounded-xl glass px-3 py-2">
         <span class="font-medium text-ink">{{ capitalizeFirst(formatDateWithWeekday(selectedSummary.date)) }}</span>
         <template v-if="selectedSummary.hasEntries">
           <span class="block text-muted mt-0.5 tabular-nums">
@@ -204,14 +202,14 @@ const axis = computed(() => {
       <p v-else class="text-muted px-1 pt-1">Тап по столбику — цифры этого дня. Столбик — съедено, чёрточка — цель.</p>
     </div>
 
-    <StatsBarChart title="Калории, ккал" :bars="barsFor('kcal')" :selected="selected" height-class="h-32" @select="select" />
-    <StatsBarChart title="Разница (съедено − потрачено), ккал" :bars="differenceBars" :selected="selected" diverging height-class="h-20" @select="select" />
+    <StatsBarChart title="Калории, ккал" color="var(--kcal)" :bars="barsFor('kcal')" :selected="selected" height-class="h-32" @select="select" />
+    <StatsBarChart title="Разница (съедено − потрачено), ккал" color="var(--activity)" :bars="differenceBars" :selected="selected" diverging height-class="h-20" @select="select" />
     <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 px-3">
       <span v-for="(label, i) in axis" :key="i">{{ label }}</span>
     </div>
-    <StatsBarChart title="Жиры, г" :bars="barsFor('fat')" :selected="selected" height-class="h-16" @select="select" />
-    <StatsBarChart title="Углеводы, г" :bars="barsFor('carbs')" :selected="selected" height-class="h-16" @select="select" />
-    <StatsBarChart title="Белки, г" :bars="barsFor('protein')" :selected="selected" height-class="h-16" @select="select" />
+    <StatsBarChart title="Жиры, г" color="var(--fat)" :bars="barsFor('fat')" :selected="selected" height-class="h-16" @select="select" />
+    <StatsBarChart title="Углеводы, г" color="var(--carbs)" :bars="barsFor('carbs')" :selected="selected" height-class="h-16" @select="select" />
+    <StatsBarChart title="Белки, г" color="var(--protein)" :bars="barsFor('protein')" :selected="selected" height-class="h-16" @select="select" />
     <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 px-3">
       <span v-for="(label, i) in axis" :key="i">{{ label }}</span>
     </div>

@@ -40,7 +40,7 @@ function pickSnack(snackId: string, name: string) {
         <button
           type="button"
           @click="pickMeal(meal)"
-          class="rounded-2xl bg-card border border-line px-4 py-3 text-left text-sm font-medium text-ink"
+          class="rounded-2xl glass px-4 py-3 text-left text-sm font-medium text-ink"
         >
           {{ MEAL_LABELS[meal] }}
         </button>
@@ -49,7 +49,7 @@ function pickSnack(snackId: string, name: string) {
           :key="snack.id"
           type="button"
           @click="pickSnack(snack.id, snack.name)"
-          class="ml-4 rounded-2xl bg-card border border-line px-4 py-2.5 text-left text-sm text-ink"
+          class="ml-4 rounded-2xl glass px-4 py-2.5 text-left text-sm text-ink"
         >
           {{ snack.name }}
         </button>

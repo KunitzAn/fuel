@@ -33,13 +33,13 @@ function pickChosen() {
         :key="day.date"
         type="button"
         @click="emit('pick', day.date)"
-        class="rounded-2xl bg-card border border-line px-4 py-3 flex items-center justify-between gap-3 text-left"
+        class="rounded-2xl glass px-4 py-3 flex items-center justify-between gap-3 text-left"
       >
         <span class="text-sm font-medium text-ink">{{ day.label }}</span>
         <span class="text-xs text-muted">{{ capitalizeFirst(formatDateWithWeekday(day.date)) }}</span>
       </button>
 
-      <label class="rounded-2xl bg-card border border-line px-4 py-3 flex items-center justify-between gap-3">
+      <label class="rounded-2xl glass px-4 py-3 flex items-center justify-between gap-3">
         <span class="text-sm font-medium text-ink">Другой день</span>
         <input
           v-model="chosen"

@@ -61,7 +61,7 @@ function resend() {
         <button
           type="button"
           @click="router.push('/settings')"
-          class="w-10 h-10 rounded-full bg-card border border-line flex items-center justify-center shrink-0"
+          class="w-10 h-10 rounded-full glass flex items-center justify-center shrink-0"
         >
           <ArrowLeft :size="20" class="text-ink" />
         </button>
@@ -79,7 +79,7 @@ function resend() {
           placeholder="you@example.com"
           autocomplete="email"
           @keyup.enter="submitEmail"
-          class="rounded-2xl bg-card border border-line p-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+          class="rounded-2xl glass p-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
         <p v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</p>
         <button
@@ -93,7 +93,7 @@ function resend() {
       </template>
 
       <template v-else>
-        <p class="text-sm text-ink bg-card border border-line rounded-2xl p-4">
+        <p class="text-sm text-ink glass rounded-2xl p-4">
           Отправили код на <strong>{{ email }}</strong> — введите его ниже, действует 15 минут.
         </p>
         <input
@@ -105,7 +105,7 @@ function resend() {
           placeholder="000000"
           autocomplete="one-time-code"
           @keyup.enter="submitCode"
-          class="rounded-2xl bg-card border border-line p-3 text-2xl text-center tracking-[0.3em] text-ink outline-none focus:ring-2 focus:ring-accent"
+          class="rounded-2xl glass p-3 text-2xl text-center tracking-[0.3em] text-ink outline-none focus:ring-2 focus:ring-accent"
         />
         <p v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</p>
         <button

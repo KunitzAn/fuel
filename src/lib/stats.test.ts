@@ -59,21 +59,18 @@ describe('createDaySummarizer', () => {
     expect(s.goal!.carbs).toBe(250) // 200 + (200 ручная + 300 Здоровье)/100 × 10
     expect(s.spentKcal).toBe(2000) // 1500 + 200 + 300
     expect(s.differenceKcal).toBe(-1085)
-    expect(s.status.kcal).toBe('ok') // 915 ≤ цели
   })
 
-  it('статистика — «Факт»: без активности цель = база, съела больше — перебор', () => {
+  it('статистика — «Факт»: без активности цель = база', () => {
     const s = summarize('2026-09-22')
     expect(s.goal!.carbs).toBe(200)
-    expect(s.status.carbs).toBe('over') // 250 при цели 200
   })
 
-  it('день до первой версии настроек — без цели, потрачено неизвестно, цвет серый', () => {
+  it('день до первой версии настроек — без цели, потрачено неизвестно', () => {
     const s = summarize('2026-08-30')
     expect(s.goal).toBeNull()
     expect(s.spentKcal).toBeNull()
     expect(s.differenceKcal).toBeNull()
-    expect(s.status.kcal).toBeNull()
   })
 
   it('день без записей', () => {

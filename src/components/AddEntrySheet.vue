@@ -92,7 +92,7 @@ function onFoodDeleted() {
         </button>
       </div>
 
-      <div class="flex items-center gap-2 rounded-2xl bg-card border border-line px-4 py-3">
+      <div class="flex items-center gap-2 rounded-2xl glass px-4 py-3">
         <input
           v-model="gramsInput"
           type="text"

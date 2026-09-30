@@ -368,7 +368,7 @@ async function saveGoals() {
   <main class="mx-auto max-w-md px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-24">
     <h1 class="text-2xl font-bold">Настройки</h1>
 
-    <section class="mt-6 rounded-2xl bg-card border border-line p-4">
+    <section class="mt-6 rounded-2xl glass p-4">
       <template v-if="checking">
         <p class="text-sm text-muted">Проверяю вход…</p>
       </template>
@@ -413,7 +413,7 @@ async function saveGoals() {
       </template>
     </section>
 
-    <section class="mt-3 rounded-2xl bg-card border border-line p-4">
+    <section class="mt-3 rounded-2xl glass p-4">
       <p class="text-sm text-ink">
         Офлайн-режим:
         <strong :class="offlineReady ? 'text-green-600' : 'text-amber-600'">
@@ -430,7 +430,7 @@ async function saveGoals() {
          здесь — черновик формы, ничего не пишется в БД, пока не нажата
          «Сохранить» внизу; прошлые дни/версии эта правка не трогает
          (та же версионируемая история, что и раньше, см. 4.1). -->
-    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+    <section class="mt-3 rounded-2xl glass p-4 flex flex-col gap-3">
       <label class="flex items-start gap-2">
         <input type="checkbox" :checked="goalsEnabled" @change="toggleGoals" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
         <span>
@@ -510,7 +510,7 @@ async function saveGoals() {
       </template>
     </section>
 
-    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+    <section class="mt-3 rounded-2xl glass p-4 flex flex-col gap-3">
       <label class="flex items-start gap-2">
         <input type="checkbox" :checked="dayTypeEnabled" @change="toggleDayType" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
         <span>
@@ -563,7 +563,7 @@ async function saveGoals() {
       </template>
     </section>
 
-    <section class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+    <section class="mt-3 rounded-2xl glass p-4 flex flex-col gap-3">
       <label class="flex items-start gap-2">
         <input type="checkbox" :checked="boundsEnabled" @change="toggleBounds" class="mt-0.5 h-4 w-4 accent-accent shrink-0" />
         <span>
@@ -623,7 +623,7 @@ async function saveGoals() {
     </section>
 
     <section class="mt-3 flex flex-col gap-2">
-      <div class="rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+      <div class="rounded-2xl glass p-4 flex flex-col gap-3">
         <span class="text-sm font-semibold text-ink">Применить</span>
         <div class="flex gap-1 text-sm">
           <button
@@ -671,7 +671,7 @@ async function saveGoals() {
       </p>
     </section>
 
-    <section v-if="me" class="mt-3 rounded-2xl bg-card border border-line p-4 flex flex-col gap-3">
+    <section v-if="me" class="mt-3 rounded-2xl glass p-4 flex flex-col gap-3">
       <h2 class="text-sm font-semibold text-ink">Активность из Здоровья (iPhone)</h2>
       <p class="text-xs text-muted">
         Сама по себе активность не подтягивается: сайты не видят приложение Здоровье, это ограничение Apple. Данные

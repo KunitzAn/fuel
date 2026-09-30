@@ -14,14 +14,13 @@ import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } fr
 import { db } from '../lib/db'
 import {
   dayGoalWithPlan,
-  displayDayStatus,
+  effectiveMaxBounds,
   computeDayGoal,
   pickGoalSettingsForDate,
   dayActivity as computeDayActivity,
   type DayTypeKind,
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
-import { statusTextClass } from '../lib/statusColors'
 import { TREAT_ICON, TREAT_LABEL_PLURAL } from '../lib/treat'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
@@ -110,13 +109,46 @@ const dayTreat = computed(() =>
   sumMacros(dayEntries.value.filter((e) => e.treat === true).map((e) => scaleByGrams(e, e.grams))),
 )
 
-// Цвет цифр в плашке — общее правило с статистикой (goals.ts →
-// computeDayStatus): по границам, если заданы; иначе по цели; иначе серый.
-// Границы берём из currentGoalSettings напрямую (4.5: «можно и с целями,
-// и без них»); активность — для галочки «верхние растут с активностью».
-const dayStatus = computed(() =>
-  displayDayStatus(currentGoalSettings.value, dayTotals.value, dayActivity.value, dayGoal.value),
-)
+// Итоги дня (этап 8): цифра и шкала — всегда в цвете нутриента (владелица
+// отказалась от цветов недобора/перебора). Шкала — доля от цели; целей нет
+// — от верхней/нижней границы. Мин/макс границы (4.5) теперь видны
+// отметками на шкале, раз цветом их больше не подсвечиваем.
+type MacroKey = 'fat' | 'carbs' | 'protein' | 'kcal'
+const MACRO_CELLS: { key: MacroKey; label: string; color: string; digits: number }[] = [
+  { key: 'fat', label: 'Ж', color: 'var(--fat)', digits: 1 },
+  { key: 'carbs', label: 'У', color: 'var(--carbs)', digits: 1 },
+  { key: 'protein', label: 'Б', color: 'var(--protein)', digits: 1 },
+  { key: 'kcal', label: 'Ккал', color: 'var(--kcal)', digits: 0 },
+]
+const BOUND_KEYS: Record<MacroKey, { min: 'minFat' | 'minCarbs' | 'minProtein' | 'minKcal'; max: 'maxFat' | 'maxCarbs' | 'maxProtein' | 'maxKcal' }> = {
+  fat: { min: 'minFat', max: 'maxFat' },
+  carbs: { min: 'minCarbs', max: 'maxCarbs' },
+  protein: { min: 'minProtein', max: 'maxProtein' },
+  kcal: { min: 'minKcal', max: 'maxKcal' },
+}
+const macroCells = computed(() => {
+  const s = currentGoalSettings.value
+  const maxes = s ? effectiveMaxBounds(s, dayActivity.value) : null
+  return MACRO_CELLS.map((c) => {
+    const value = dayTotals.value[c.key]
+    const goal = dayGoal.value ? dayGoal.value[c.key] : null
+    const min = s?.[BOUND_KEYS[c.key].min] ?? null
+    const max = maxes?.[BOUND_KEYS[c.key].max] ?? null
+    const scale = goal ?? max ?? min
+    const pct = (v: number | null) => (v === null || !scale ? null : Math.min(100, (v / scale) * 100))
+    const changed =
+      dayGoal.value && c.key !== 'kcal' ? dayGoal.value[`${c.key}Changed` as 'fatChanged' | 'carbsChanged' | 'proteinChanged'] : false
+    return {
+      ...c,
+      // от 100 — без десятых: четыре числа с целью должны влезть в строку
+      value: c.digits && value < 100 ? value.toFixed(c.digits) : String(Math.round(value)),
+      goal: goal === null ? null : Math.round(goal),
+      changed,
+      fill: pct(value),
+      ticks: [pct(min), pct(max)].filter((t): t is number => t !== null && t < 100),
+    }
+  })
+})
 // Высота прилипшей плашки итогов — отступ для прилипающей шапки приёма
 const dayHeaderEl = ref<HTMLElement | null>(null)
 const dayHeaderHeight = ref(0)
@@ -180,7 +212,7 @@ onBeforeRouteLeave((to) => {
 
 <template>
   <!-- Под статус-баром iPhone прилипшие плашки не должны просвечивать -->
-  <div class="fixed top-0 inset-x-0 z-30 h-[env(safe-area-inset-top)] bg-bg" />
+  <div class="fixed top-0 inset-x-0 z-30 h-[env(safe-area-inset-top)] bg-bg/70 backdrop-blur-xl" />
   <main
     class="mx-auto max-w-md px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-24 flex flex-col gap-4"
     :style="{ '--day-header-h': `${dayHeaderHeight}px` }"
@@ -216,7 +248,7 @@ onBeforeRouteLeave((to) => {
       <div class="flex items-center gap-2">
         <span class="text-[11px] text-muted w-9 shrink-0">План</span>
         <div class="flex gap-1 text-xs flex-1">
-          <button type="button" @click="pickPlan(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.planned ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+          <button type="button" @click="pickPlan(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.planned ? 'bg-accent text-white' : 'glass text-muted'">
             Обычный
           </button>
           <button
@@ -224,7 +256,7 @@ onBeforeRouteLeave((to) => {
             :disabled="!activityGoal"
             @click="pickPlan('high')"
             class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
-            :class="dayType?.planned === 'high' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'"
+            :class="dayType?.planned === 'high' ? 'bg-accent text-white' : 'glass text-muted'"
           >
             Высокоугл.
           </button>
@@ -233,7 +265,7 @@ onBeforeRouteLeave((to) => {
             :disabled="!activityGoal"
             @click="pickPlan('low')"
             class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
-            :class="dayType?.planned === 'low' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'"
+            :class="dayType?.planned === 'low' ? 'bg-accent text-white' : 'glass text-muted'"
           >
             Низкоугл.
           </button>
@@ -242,13 +274,13 @@ onBeforeRouteLeave((to) => {
       <div class="flex items-center gap-2">
         <span class="text-[11px] text-muted w-9 shrink-0">Факт</span>
         <div class="flex gap-1 text-xs flex-1">
-          <button type="button" @click="pickFact(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.actual ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+          <button type="button" @click="pickFact(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.actual ? 'bg-accent/45 text-ink' : 'glass text-muted'">
             Обычный
           </button>
-          <button type="button" @click="pickFact('high')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'high' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+          <button type="button" @click="pickFact('high')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'high' ? 'bg-accent/45 text-ink' : 'glass text-muted'">
             Высокоугл.
           </button>
-          <button type="button" @click="pickFact('low')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'low' ? 'bg-accent text-white' : 'bg-card border border-line text-muted'">
+          <button type="button" @click="pickFact('low')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'low' ? 'bg-accent/45 text-ink' : 'glass text-muted'">
             Низкоугл.
           </button>
         </div>
@@ -260,51 +292,39 @@ onBeforeRouteLeave((to) => {
          (--day-header-h, см. ResizeObserver выше) -->
     <div
       ref="dayHeaderEl"
-      class="sticky z-20 -mx-4 px-4 -my-2 py-2 bg-bg"
+      class="sticky z-20 -mx-4 px-4 -my-2 py-2"
       style="top: env(safe-area-inset-top)"
     >
-      <div class="rounded-2xl bg-card border border-line px-4 py-3 grid grid-cols-4 text-center">
-        <div v-if="activityGoal" class="col-span-4 flex justify-center mb-2">
-          <div class="flex rounded-full border border-line p-0.5 text-xs">
+      <div class="rounded-3xl glass glow-tr px-4 pt-3 pb-3.5 grid grid-cols-[1fr_1fr_1fr_1.2fr] gap-x-2.5" style="--glow: var(--kcal)">
+        <div v-if="activityGoal" class="col-span-4 flex justify-center mb-2.5">
+          <div class="flex rounded-full glass p-0.5 text-xs">
             <button
-              v-for="v in [{ k: 'fact', l: 'Факт' }, { k: 'plan', l: 'План' }] as const"
+              v-for="v in [{ k: 'fact', l: 'Факт', c: 'var(--breakfast)' }, { k: 'plan', l: 'План', c: 'var(--kcal)' }] as const"
               :key="v.k"
               type="button"
               @click="goalView = v.k"
-              class="px-3 py-1 rounded-full"
-              :class="goalView === v.k ? 'bg-accent text-white' : 'text-muted'"
+              class="px-3.5 py-1 rounded-full font-medium"
+              :style="goalView === v.k ? { backgroundColor: v.c, color: 'white' } : { color: v.c }"
             >
               {{ v.l }}
             </button>
           </div>
         </div>
-        <div>
-          <p class="text-[11px] text-muted">Ж</p>
-          <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.fat)">
-            {{ dayTotals.fat.toFixed(1) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.fat) }}<span v-if="dayGoal.fatChanged">⚡</span></span>
+        <div v-for="c in macroCells" :key="c.key" class="min-w-0">
+          <p class="text-[11px] text-muted">{{ c.label }}<template v-if="c.changed"> ⚡</template></p>
+          <p class="leading-tight whitespace-nowrap">
+            <span class="font-bold" :class="c.key === 'kcal' ? 'text-xl' : 'text-base'" :style="{ color: c.color }">{{ c.value }}</span
+            ><span v-if="c.goal !== null" class="text-[11px] text-muted">/{{ c.goal }}</span>
           </p>
-        </div>
-        <div>
-          <p class="text-[11px] text-muted">У</p>
-          <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.carbs)">
-            {{ dayTotals.carbs.toFixed(1) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.carbs) }}<span v-if="dayGoal.carbsChanged">⚡</span></span>
-          </p>
-        </div>
-        <div>
-          <p class="text-[11px] text-muted">Б</p>
-          <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.protein)">
-            {{ dayTotals.protein.toFixed(1) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.protein) }}<span v-if="dayGoal.proteinChanged">⚡</span></span>
-          </p>
-        </div>
-        <div>
-          <p class="text-[11px] text-muted">Ккал</p>
-          <p class="text-sm font-semibold" :class="statusTextClass(dayStatus.kcal)">
-            {{ Math.round(dayTotals.kcal) }}<span v-if="dayGoal" class="font-normal text-muted">/{{ Math.round(dayGoal.kcal) }}</span>
-          </p>
+          <!-- Шкала: доля от цели, отметки — мин/макс границы (4.5) -->
+          <div class="relative mt-1.5 h-1.5 rounded-full" :style="{ backgroundColor: `color-mix(in srgb, ${c.color} 18%, transparent)` }">
+            <div v-if="c.fill !== null" class="absolute inset-y-0 left-0 rounded-full" :style="{ width: `${c.fill}%`, backgroundColor: c.color }" />
+            <div v-for="(t, i) in c.ticks" :key="i" class="absolute -top-0.5 -bottom-0.5 w-0.5 rounded-full bg-ink/40" :style="{ left: `${t}%` }" />
+          </div>
         </div>
         <!-- Сколько из съеденного — «не основная» еда (lib/treat.ts) -->
-        <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-2 text-xs text-muted">
-          {{ TREAT_ICON }} {{ TREAT_LABEL_PLURAL }}: {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
+        <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-3 text-xs text-muted">
+          <span class="rounded-full px-1.5 py-0.5" :style="{ backgroundColor: 'color-mix(in srgb, var(--treat) 16%, transparent)', color: 'var(--treat)' }">{{ TREAT_ICON }} {{ TREAT_LABEL_PLURAL }}</span> {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
           Ж {{ dayTreat.fat.toFixed(1) }} · У {{ dayTreat.carbs.toFixed(1) }} · Б {{ dayTreat.protein.toFixed(1) }}
         </p>
       </div>
