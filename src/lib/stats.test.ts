@@ -56,7 +56,7 @@ describe('createDaySummarizer', () => {
     const s = summarize('2026-09-21')
     expect(s.hasEntries).toBe(true)
     expect(s.eaten).toEqual({ protein: 30, fat: 15, carbs: 150, kcal: 915 })
-    expect(s.goal!.carbs).toBe(250) // 200 + 500/100 × 10
+    expect(s.goal!.carbs).toBe(220) // 200 + 200/100 × 10 — прибавка только от ручной тренировки, не от Здоровья
     expect(s.spentKcal).toBe(2000) // 1500 + 200 + 300
     expect(s.differenceKcal).toBe(-1085)
     expect(s.status.kcal).toBe('ok') // 915 ≤ цели

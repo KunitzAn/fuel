@@ -7,7 +7,7 @@ import { addMonths, daysInMonth, shiftDate, toDateString, weekDates, type Month 
 import type { Activity, DailyActiveEnergy, DayType, Entry, GoalSettings } from './db'
 import {
   computeDayGoal,
-  dayActivityKcal,
+  dayActivity,
   dayGoalWithPlan,
   displayDayStatus,
   pickGoalSettingsForDate,
@@ -58,7 +58,7 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
     const dayEntries = entriesByDate.get(date) ?? []
     const eaten = sumMacros(dayEntries.map((e) => scaleByGrams(e, e.grams)))
     const settings = pickGoalSettingsForDate(source.goalSettings, date)
-    const activity = dayActivityKcal(activitiesByDate.get(date) ?? [], healthByDate.get(date) ?? null)
+    const activity = dayActivity(activitiesByDate.get(date) ?? [], healthByDate.get(date) ?? null)
     const goal = dayGoalWithPlan(settings ? computeDayGoal(settings, activity) : null, dayTypeByDate.get(date) ?? null)
     const spentKcal = goal ? goal.spentKcal : null
     return {

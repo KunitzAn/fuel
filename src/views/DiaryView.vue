@@ -17,7 +17,7 @@ import {
   displayDayStatus,
   computeDayGoal,
   pickGoalSettingsForDate,
-  dayActivityKcal,
+  dayActivity as computeDayActivity,
   type DayTypeKind,
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
@@ -39,7 +39,7 @@ const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === n
 const allSnacks = useLiveQuery(() => db.snacks.filter((s) => s.deletedAt === null).toArray(), [])
 const allActivities = useLiveQuery(() => db.activities.filter((a) => a.deletedAt === null).toArray(), [])
 const allGoalSettings = useLiveQuery(() => db.goalSettings.filter((g) => g.deletedAt === null).toArray(), [])
-// Этап 5: активная энергия за день из Здоровья — складывается с ручными активностями (goals.ts → dayActivityKcal).
+// Этап 5: активная энергия за день из Здоровья — в «потрачено», не в прибавку к цели (goals.ts → dayActivity).
 const allDailyActiveEnergy = useLiveQuery(() => db.dailyActiveEnergy.filter((r) => r.deletedAt === null).toArray(), [])
 const allDayTypes = useLiveQuery(() => db.dayTypes.filter((d) => d.deletedAt === null).toArray(), [])
 
@@ -49,7 +49,7 @@ const allDayTypes = useLiveQuery(() => db.dayTypes.filter((d) => d.deletedAt ===
 const dayActivities = computed(() => allActivities.value.filter((a) => a.date === date.value))
 const dayDailyActiveEnergy = computed(() => allDailyActiveEnergy.value.find((r) => r.date === date.value) ?? null)
 const currentGoalSettings = computed(() => pickGoalSettingsForDate(allGoalSettings.value, date.value))
-const dayActivity = computed(() => dayActivityKcal(dayActivities.value, dayDailyActiveEnergy.value))
+const dayActivity = computed(() => computeDayActivity(dayActivities.value, dayDailyActiveEnergy.value))
 const activityGoal = computed(() =>
   currentGoalSettings.value ? computeDayGoal(currentGoalSettings.value, dayActivity.value) : null,
 )

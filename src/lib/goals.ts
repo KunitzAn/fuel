@@ -40,13 +40,32 @@ export interface GoalInput {
   maxFollowsActivity: boolean
 }
 
+/**
+ * Активность дня двумя числами (владелица, после этапа 6): прибавка к цели
+ * «на 100 ккал» — только от тренировок и вписанных вручную активностей
+ * (`training`), а «потрачено» — от всей активной энергии дня, вместе с
+ * Здоровьем (`total`). Число вместо объекта — одно и то же для обоих.
+ */
+export interface DayActivity {
+  training: number
+  total: number
+}
+export type ActivityInput = number | DayActivity
+function toDayActivity(a: ActivityInput): DayActivity {
+  const v = typeof a === 'number' ? { training: a, total: a } : a
+  return { training: Math.max(0, v.training), total: Math.max(0, v.total) }
+}
+
 export interface DayGoal {
   protein: number
   fat: number
   carbs: number
   kcal: number
+  /** Вся активность дня (ручная + Здоровье) — то, что в «потрачено». */
   activityKcal: number
-  spentKcal: number // энергия покоя + активность
+  /** Только тренировки/ручные — от них прибавка «на 100 ккал». */
+  trainingKcal: number
+  spentKcal: number // энергия покоя + вся активность
   /** Который из макросов реально выросли от активности — ⚡ у той ячейки в шапке (README). */
   proteinChanged: boolean
   fatChanged: boolean
@@ -72,12 +91,13 @@ export function hasBaseGoal(settings: Pick<GoalInput, 'baseProtein' | 'baseFat' 
  *
  * База неполная (или её вовсе нет) — цели не бывает, `null`.
  */
-export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGoal | null {
+export function computeDayGoal(settings: GoalInput, activityInput: ActivityInput): DayGoal | null {
   if (!hasBaseGoal(settings)) return null
-  const clampedActivity = Math.max(0, activityKcal)
-  const protein = settings.baseProtein! + (clampedActivity / 100) * (settings.perHundredProtein ?? 0)
-  const fat = settings.baseFat! + (clampedActivity / 100) * (settings.perHundredFat ?? 0)
-  const carbs = settings.baseCarbs! + (clampedActivity / 100) * (settings.perHundredCarbs ?? 0)
+  const activity = toDayActivity(activityInput)
+  const bonus = activity.training / 100
+  const protein = settings.baseProtein! + bonus * (settings.perHundredProtein ?? 0)
+  const fat = settings.baseFat! + bonus * (settings.perHundredFat ?? 0)
+  const carbs = settings.baseCarbs! + bonus * (settings.perHundredCarbs ?? 0)
   const proteinChanged = protein > settings.baseProtein!
   const fatChanged = fat > settings.baseFat!
   const carbsChanged = carbs > settings.baseCarbs!
@@ -86,8 +106,9 @@ export function computeDayGoal(settings: GoalInput, activityKcal: number): DayGo
     fat,
     carbs,
     kcal: kcalFromMacros(protein, fat, carbs),
-    activityKcal: clampedActivity,
-    spentKcal: settings.restingKcal! + clampedActivity,
+    activityKcal: activity.total,
+    trainingKcal: activity.training,
+    spentKcal: settings.restingKcal! + activity.total,
     proteinChanged,
     fatChanged,
     carbsChanged,
@@ -100,16 +121,18 @@ export function sumActivityKcal(activities: Pick<Activity, 'kcal'>[]): number {
 }
 
 /**
- * Активность дня для цели и «потрачено» = ручные активности + активная
- * энергия за день из Здоровья (Команда iOS, этап 5.2). Владелица решила
- * складывать всё, даже если тренировка есть и там, и там — риск двойного
- * счёта на её стороне. Нет данных из Здоровья — только ручные.
+ * Активность дня: `training` — ручные активности и тренировки (таблица
+ * `activities`), от них прибавка к цели; `total` — плюс активная энергия
+ * за день из Здоровья (Команда iOS, этап 5.2), это «потрачено». Владелица
+ * решила складывать всё, даже если тренировка есть и там, и там — риск
+ * двойного счёта на её стороне. Нет данных из Здоровья — только ручные.
  */
-export function dayActivityKcal(
+export function dayActivity(
   activities: Pick<Activity, 'kcal'>[],
   health: Pick<DailyActiveEnergy, 'totalActiveKcal'> | null,
-): number {
-  return sumActivityKcal(activities) + (health?.totalActiveKcal ?? 0)
+): DayActivity {
+  const training = sumActivityKcal(activities)
+  return { training, total: training + (health?.totalActiveKcal ?? 0) }
 }
 
 /** README: «разница = съедено − потрачено» — минус означает дефицит. */
@@ -292,19 +315,20 @@ type BoundsInput = Pick<
 
 /**
  * Чекбокс «Верхняя граница растёт с активностью» (владелица, после 5.2):
- * макс ккал + вся активность дня, макс Б/Ж/У + то же «на 100 ккал», что и
- * у цели (не задано — этот макс не двигается). Нижние границы и
+ * макс ккал + вся активность дня (как «потрачено»), макс Б/Ж/У + то же
+ * «на 100 ккал», что и у цели, то есть только от тренировок/ручных (не
+ * задано — этот макс не двигается). Нижние границы и
  * незаданные верхние не трогаем. Выключено — границы как вписаны.
  */
 export function effectiveMaxBounds(
   settings: BoundsInput,
-  activityKcal: number,
+  activityInput: ActivityInput,
 ): Pick<GoalInput, 'maxKcal' | 'maxProtein' | 'maxFat' | 'maxCarbs'> {
-  const activity = settings.maxFollowsActivity ? Math.max(0, activityKcal) : 0
+  const activity = settings.maxFollowsActivity ? toDayActivity(activityInput) : { training: 0, total: 0 }
   const grow = (max: number | null, perHundred: number | null) =>
-    max == null ? null : max + (activity / 100) * (perHundred ?? 0)
+    max == null ? null : max + (activity.training / 100) * (perHundred ?? 0)
   return {
-    maxKcal: settings.maxKcal == null ? null : settings.maxKcal + activity,
+    maxKcal: settings.maxKcal == null ? null : settings.maxKcal + activity.total,
     maxProtein: grow(settings.maxProtein, settings.perHundredProtein),
     maxFat: grow(settings.maxFat, settings.perHundredFat),
     maxCarbs: grow(settings.maxCarbs, settings.perHundredCarbs),
@@ -314,9 +338,9 @@ export function effectiveMaxBounds(
 export function computeDayBoundsStatus(
   settings: BoundsInput,
   eaten: { kcal: number; protein: number; fat: number; carbs: number },
-  activityKcal: number,
+  activity: ActivityInput,
 ): DayBoundsStatus {
-  const max = effectiveMaxBounds(settings, activityKcal)
+  const max = effectiveMaxBounds(settings, activity)
   return {
     kcal: nutrientBoundStatus(eaten.kcal, settings.minKcal, max.maxKcal),
     protein: nutrientBoundStatus(eaten.protein, settings.minProtein, max.maxProtein),
@@ -337,10 +361,10 @@ export function computeDayBoundsStatus(
 export function computeDayStatus(
   settings: BoundsInput | null,
   eaten: { kcal: number; protein: number; fat: number; carbs: number },
-  activityKcal: number,
+  activity: ActivityInput,
   goal: { kcal: number; protein: number; fat: number; carbs: number } | null,
 ): DayBoundsStatus {
-  const bounds = settings ? computeDayBoundsStatus(settings, eaten, activityKcal) : null
+  const bounds = settings ? computeDayBoundsStatus(settings, eaten, activity) : null
   const pick = (key: keyof DayBoundsStatus): BoundStatus | null => {
     const byBounds = bounds?.[key] ?? null
     if (byBounds) return byBounds
@@ -358,13 +382,13 @@ export function computeDayStatus(
 export function displayDayStatus(
   settings: BoundsInput | null,
   eaten: { kcal: number; protein: number; fat: number; carbs: number },
-  activityKcal: number,
+  activity: ActivityInput,
   goal: DayGoal | null,
 ): DayBoundsStatus {
   return computeDayStatus(
     settings,
     { ...eaten, kcal: Math.round(eaten.kcal) },
-    activityKcal,
+    activity,
     goal
       ? {
           kcal: Math.round(goal.kcal),

@@ -5,7 +5,7 @@ import {
   computeDayGoal,
   computeDayStatus,
   effectiveMaxBounds,
-  dayActivityKcal,
+  dayActivity,
   energyDifference,
   hasBaseGoal,
   isDayTypeDeltaConfigured,
@@ -14,6 +14,7 @@ import {
   pickGoalSettingsForDate,
   statsDayTypeDelta,
   sumActivityKcal,
+  type ActivityInput,
   type GoalInput,
 } from './goals'
 
@@ -43,7 +44,7 @@ const settings: GoalInput = {
 }
 
 /** Все настройки в этом файле заполнены — цель точно есть, разворачиваем null для краткости тестов. */
-function goal(input: GoalInput, activityKcal: number) {
+function goal(input: GoalInput, activityKcal: ActivityInput) {
   const g = computeDayGoal(input, activityKcal)
   if (!g) throw new Error('expected a goal, got null')
   return g
@@ -152,20 +153,26 @@ describe('sumActivityKcal', () => {
   })
 })
 
-describe('dayActivityKcal', () => {
-  it('ручные + активная энергия из Здоровья складываются', () => {
-    expect(dayActivityKcal([{ kcal: 300 }], { totalActiveKcal: 1152 })).toBe(1452)
+describe('dayActivity', () => {
+  it('тренировки/ручные отдельно, всё вместе со Здоровьем — отдельно', () => {
+    expect(dayActivity([{ kcal: 300 }], { totalActiveKcal: 1152 })).toEqual({ training: 300, total: 1452 })
   })
   it('нет данных из Здоровья — только ручные', () => {
-    expect(dayActivityKcal([{ kcal: 300 }], null)).toBe(300)
+    expect(dayActivity([{ kcal: 300 }], null)).toEqual({ training: 300, total: 300 })
   })
   it('строка из Здоровья есть, но активная ещё не пришла (только покой) — не ломает счёт', () => {
-    expect(dayActivityKcal([], { totalActiveKcal: null })).toBe(0)
+    expect(dayActivity([], { totalActiveKcal: null })).toEqual({ training: 0, total: 0 })
   })
-  it('поднимает цель через «на 100 ккал» так же, как ручная активность', () => {
-    const g = goal(settings, dayActivityKcal([], { totalActiveKcal: 500 }))
-    expect(g.carbs).toBe(150 + 90) // 500/100 × 18
+  it('Здоровье идёт в «потрачено», но не в прибавку «на 100 ккал»', () => {
+    const g = goal(settings, dayActivity([], { totalActiveKcal: 500 }))
+    expect(g.carbs).toBe(150)
+    expect(g.changedByActivity).toBe(false)
     expect(g.spentKcal).toBe(1450 + 500)
+  })
+  it('ручная тренировка поднимает цель, Здоровье — только «потрачено»', () => {
+    const g = goal(settings, dayActivity([{ kcal: 400 }], { totalActiveKcal: 600 }))
+    expect(g.carbs).toBe(150 + 72) // 400/100 × 18
+    expect(g.spentKcal).toBe(1450 + 1000)
   })
 })
 
@@ -425,5 +432,21 @@ describe('computeDayStatus', () => {
     const status = computeDayStatus({ ...noBounds, minProtein: 100 }, eaten, 0, goal)
     expect(status.protein).toBe('under')
     expect(status.kcal).toBe('over')
+  })
+})
+
+describe('effectiveMaxBounds — две активности', () => {
+  it('макс ккал растёт на всю активность, макс Б/Ж/У — только от тренировок', () => {
+    const bounds = {
+      minKcal: null, maxKcal: 2000, minProtein: null, maxProtein: 150, minFat: null, maxFat: null,
+      minCarbs: null, maxCarbs: 200, perHundredProtein: 2, perHundredFat: null, perHundredCarbs: 10,
+      maxFollowsActivity: true,
+    }
+    expect(effectiveMaxBounds(bounds, { training: 300, total: 800 })).toEqual({
+      maxKcal: 2800,
+      maxProtein: 156,
+      maxFat: null,
+      maxCarbs: 230,
+    })
   })
 })

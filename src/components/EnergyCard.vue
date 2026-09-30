@@ -16,7 +16,7 @@ const props = defineProps<{
   goal: DayGoal | null // null — цели ещё не настроены (README «без настроек»)
   eatenKcal: number
   // Этап 5: энергия за день из Здоровья (Команда iOS). Активная уже
-  // сложена с ручными в `goal` (goals.ts → dayActivityKcal), здесь — только
+  // в «потрачено» у `goal` (goals.ts → dayActivity), здесь — только
   // показать её строкой в списке. Покой — только для просмотра.
   dailyActiveEnergy: DailyActiveEnergy | null
   // Из Здоровья не пришло ни одного дня — скорее всего, Команда не

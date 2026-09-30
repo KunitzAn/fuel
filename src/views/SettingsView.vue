@@ -458,6 +458,10 @@ async function saveGoals() {
             </label>
           </div>
           <p class="text-xs text-muted">≈ {{ Math.round(perHundredKcalHint) }} ккал — подсказка, не входит в расчёт</p>
+          <p class="text-xs text-muted">
+            Считается только от тренировок и активностей, добавленных вручную. Активная энергия за весь день из Здоровья
+            цель не поднимает — она идёт только в «Потрачено».
+          </p>
         </div>
 
         <p class="text-xs text-muted">
