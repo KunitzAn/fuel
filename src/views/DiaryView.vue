@@ -22,7 +22,7 @@ import {
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { statusTextClass } from '../lib/statusColors'
-import { TREAT_ICON, TREAT_LABEL } from '../lib/treat'
+import { TREAT_ICON, TREAT_LABEL_PLURAL } from '../lib/treat'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner']
@@ -304,7 +304,7 @@ onBeforeRouteLeave((to) => {
         </div>
         <!-- Сколько из съеденного — «не основная» еда (lib/treat.ts) -->
         <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-2 text-xs text-muted">
-          {{ TREAT_ICON }} {{ TREAT_LABEL }}: {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
+          {{ TREAT_ICON }} {{ TREAT_LABEL_PLURAL }}: {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
           Ж {{ dayTreat.fat.toFixed(1) }} · У {{ dayTreat.carbs.toFixed(1) }} · Б {{ dayTreat.protein.toFixed(1) }}
         </p>
       </div>
