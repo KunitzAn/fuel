@@ -21,7 +21,7 @@ import {
   type DayTypeKind,
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
-import { TREAT_ICON, TREAT_LABEL_PLURAL } from '../lib/treat'
+import { TREAT_LABEL_PLURAL, TreatIcon } from '../lib/treat'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner']
@@ -326,7 +326,7 @@ onBeforeRouteLeave((to) => {
         </div>
         <!-- Сколько из съеденного — «не основная» еда (lib/treat.ts) -->
         <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-3 text-xs text-muted">
-          <span class="rounded-full px-1.5 py-0.5" :style="{ backgroundColor: 'color-mix(in srgb, var(--treat) 16%, transparent)', color: 'var(--treat)' }">{{ TREAT_ICON }} {{ TREAT_LABEL_PLURAL }}</span> {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
+          <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 align-middle bg-treat/15 text-treat"><TreatIcon :size="12" />{{ TREAT_LABEL_PLURAL }}</span> {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
           Ж {{ dayTreat.fat.toFixed(1) }} · У {{ dayTreat.carbs.toFixed(1) }} · Б {{ dayTreat.protein.toFixed(1) }}
         </p>
       </div>

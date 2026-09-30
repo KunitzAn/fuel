@@ -7,4 +7,5 @@
 export const TREAT_LABEL = 'Вкусняшка'
 /** Итоги в шапке дня и в статистике. */
 export const TREAT_LABEL_PLURAL = 'Вкусняшки'
-export const TREAT_ICON = '🍬'
+// Контурная иконка конфеты в розовом (владелица попросила вместо эмодзи 🍬)
+export { Candy as TreatIcon } from '@lucide/vue'

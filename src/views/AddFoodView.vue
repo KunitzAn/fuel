@@ -40,7 +40,10 @@ const tab = ref<'history' | 'products' | 'dishes' | 'catalog'>('history')
 const query = ref('')
 const searching = computed(() => query.value.trim().length > 0)
 
-const allEntries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === null).toArray(), [])
+// С удалёнными: удалённая из дневника еда остаётся в Истории — и в общей, и
+// в фильтре своего приёма (владелица). Удаление убирает запись из дня, но
+// не стирает то, что ты это ела. Граммы с прошлого раза — тоже с них.
+const allEntries = useLiveQuery(() => db.entries.toArray(), [])
 const allFoods = useLiveQuery(() => db.foods.filter((f) => f.deletedAt === null).toArray(), [])
 const foodsById = computed(() => new Map(allFoods.value.map((f) => [f.id, f])))
 // «Моя версия» продукта из базы (этап 2.6) показывается вместо оригинала —

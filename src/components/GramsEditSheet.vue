@@ -6,7 +6,7 @@ import { Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import FoodFormSheet from './FoodFormSheet.vue'
 import { withBrand } from '../lib/pick'
-import { TREAT_ICON, TREAT_LABEL } from '../lib/treat'
+import { TREAT_LABEL, TreatIcon } from '../lib/treat'
 import { db, type Entry, type Food } from '../lib/db'
 import { softDeleteEntry, updateEntryGrams } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
@@ -115,7 +115,8 @@ async function remove() {
 
       <label class="flex items-center gap-2 text-sm text-ink">
         <input v-model="treat" type="checkbox" class="h-4 w-4 accent-accent shrink-0" />
-        {{ TREAT_ICON }} {{ TREAT_LABEL }}
+        <TreatIcon :size="16" class="text-treat" />
+        {{ TREAT_LABEL }}
       </label>
 
       <div class="flex gap-2">

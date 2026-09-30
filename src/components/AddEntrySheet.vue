@@ -22,8 +22,14 @@ const emit = defineEmits<{ close: []; added: [] }>()
 const editingFood = ref(false)
 
 // Граммы с прошлого раза для этого продукта — впервые 100 г (README).
-const gramsInput = ref(String(props.item.lastGrams ?? 100))
-const grams = computed(() => parseDecimal(gramsInput.value) ?? 0)
+// Тап по полю очищает его — как в окне правки записи (владелица); граммы с
+// прошлого раза остаются подсказкой и значением, пока ничего не вписано
+const defaultGrams = props.item.lastGrams ?? 100
+const gramsInput = ref(String(defaultGrams))
+const grams = computed(() => parseDecimal(gramsInput.value) ?? defaultGrams)
+function clearOnFocus() {
+  if (gramsInput.value === String(defaultGrams)) gramsInput.value = ''
+}
 const target = ref<MealTarget>(props.target)
 const pickingTarget = ref(false)
 
@@ -98,6 +104,8 @@ function onFoodDeleted() {
           type="text"
           inputmode="decimal"
           autofocus
+          :placeholder="String(defaultGrams)"
+          @focus="clearOnFocus"
           class="flex-1 text-2xl font-semibold text-ink bg-transparent outline-none"
         />
         <span class="text-sm text-muted">г</span>
