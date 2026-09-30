@@ -52,26 +52,51 @@ const myVersionByCatalog = computed(
 // История — без дублей: один продукт один раз, последний использованный
 // сверху, с последними граммами (обратная связь; README был по дням).
 // Теперь в ней и продукты каталога — ключ по foodId либо catalogId.
-const historyRows = computed(() => {
+//
+// 1.8: фильтр по приёму пищи (Все · Завтрак · Обед · Ужин · Перекусы —
+// все перекусы разом, как бы ни назывались). Он решает только, КАКИЕ
+// продукты и в каком порядке; граммы — всё равно из последнего раза в
+// любом приёме (владелица), поэтому строка берётся из общей «последней».
+// Куда добавляется еда, фильтр не меняет — это `target`.
+type HistoryFilter = 'all' | 'breakfast' | 'lunch' | 'dinner' | 'snack'
+const HISTORY_FILTERS: { value: HistoryFilter; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'breakfast', label: 'Завтрак' },
+  { value: 'lunch', label: 'Обед' },
+  { value: 'dinner', label: 'Ужин' },
+  { value: 'snack', label: 'Перекусы' },
+]
+const historyFilter = ref<HistoryFilter>('all')
+
+function buildHistory(filter: HistoryFilter) {
   const latest = new Map<string, Entry>()
+  const usedAt = new Map<string, string>() // когда последний раз — в выбранном приёме
   for (const e of allEntries.value) {
     const key = e.foodId ? `food:${e.foodId}` : e.catalogId ? `catalog:${e.catalogId}` : null
     if (!key || !matchesQuery(query.value, e.name, e.brand)) continue
     const prev = latest.get(key)
     if (!prev || e.createdAt > prev.createdAt) latest.set(key, e)
+    if (filter !== 'all' && e.meal !== filter) continue
+    const prevUsed = usedAt.get(key)
+    if (!prevUsed || e.createdAt > prevUsed) usedAt.set(key, e.createdAt)
   }
   // Запись с оригиналом из базы, а у меня уже есть «моя версия» — в Истории
   // показываем версию (этап 2.6: «мой вариант вместо оригинала»). Тогда два
   // ключа могут схлопнуться в один продукт — оставляем более свежий.
   const seen = new Set<string>()
-  return [...latest.values()]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((e) => {
+  return [...usedAt]
+    .sort((a, b) => b[1].localeCompare(a[1]))
+    .map(([key]) => {
+      const e = latest.get(key)!
       const version = !e.foodId && e.catalogId ? myVersionByCatalog.value.get(e.catalogId) : undefined
       return { entry: e, item: version ? pickFromFood(version) : pickFromEntry(e, foodsById.value) }
     })
     .filter((r): r is { entry: Entry; item: PickItem } => r.item !== null && !seen.has(r.item.key) && (seen.add(r.item.key), true))
-})
+}
+const historyRows = computed(() => buildHistory(historyFilter.value))
+// В поиске вкладок (и переключателя) не видно — ищем по всей Истории,
+// иначе продукт «пропадал» бы из-за фильтра, которого не видно.
+const searchHistoryRows = computed(() => buildHistory('all'))
 
 const productRows = computed(() =>
   allFoods.value
@@ -109,7 +134,7 @@ const catalogRows = computed(() =>
 const searchBlocks = computed(() => {
   const used = new Set<string>()
   const take = (rows: PickItem[]) => rows.filter((r) => !used.has(r.key) && (used.add(r.key), true))
-  const history = historyRows.value.filter((r) => !used.has(r.item.key) && (used.add(r.item.key), true))
+  const history = searchHistoryRows.value.filter((r) => !used.has(r.item.key) && (used.add(r.item.key), true))
   return {
     history,
     products: take(productRows.value),
@@ -311,6 +336,18 @@ function titleFor(item: PickItem): string {
 
       <!-- Без поиска: вкладки -->
       <template v-else-if="tab === 'history'">
+        <div class="flex gap-1.5 mb-3 overflow-x-auto -mx-4 px-4">
+          <button
+            v-for="f in HISTORY_FILTERS"
+            :key="f.value"
+            type="button"
+            @click="historyFilter = f.value"
+            class="shrink-0 rounded-full px-3 py-1 text-xs border"
+            :class="historyFilter === f.value ? 'bg-ink text-bg border-ink' : 'border-line text-muted'"
+          >
+            {{ f.label }}
+          </button>
+        </div>
         <div class="rounded-2xl bg-card border border-line overflow-hidden">
           <p v-if="historyRows.length === 0" class="px-4 py-3 text-sm text-muted">Пока пусто</p>
           <FoodListRow
