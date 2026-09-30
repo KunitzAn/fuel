@@ -3,6 +3,7 @@ import {
   applyDayTypeDelta,
   computeDayBoundsStatus,
   computeDayGoal,
+  computeDayStatus,
   effectiveMaxBounds,
   dayActivityKcal,
   energyDifference,
@@ -390,5 +391,39 @@ describe('effectiveMaxBounds', () => {
     const status = computeDayBoundsStatus(bounds, { kcal: 2300, protein: 90, fat: 50, carbs: 250 }, 500)
     expect(status.kcal).toBe('ok')
     expect(status.protein).toBe('under')
+  })
+})
+
+describe('computeDayStatus', () => {
+  const noBounds = {
+    minKcal: null,
+    maxKcal: null,
+    minProtein: null,
+    maxProtein: null,
+    minFat: null,
+    maxFat: null,
+    minCarbs: null,
+    maxCarbs: null,
+    maxFollowsActivity: false,
+    perHundredProtein: null,
+    perHundredFat: null,
+    perHundredCarbs: null,
+  }
+  const eaten = { kcal: 2100, protein: 90, fat: 60, carbs: 200 }
+  const goal = { kcal: 2000, protein: 120, fat: 60, carbs: 250 }
+
+  it('ни цели, ни границ — всё null (серое)', () => {
+    expect(computeDayStatus(noBounds, eaten, 0, null)).toEqual({ kcal: null, protein: null, fat: null, carbs: null })
+    expect(computeDayStatus(null, eaten, 0, null)).toEqual({ kcal: null, protein: null, fat: null, carbs: null })
+  })
+
+  it('только цель — перебор красный, всё остальное (и недобор, и ровно) зелёное', () => {
+    expect(computeDayStatus(noBounds, eaten, 0, goal)).toEqual({ kcal: 'over', protein: 'ok', fat: 'ok', carbs: 'ok' })
+  })
+
+  it('граница по нутриенту важнее цели; где границ нет — по цели', () => {
+    const status = computeDayStatus({ ...noBounds, minProtein: 100 }, eaten, 0, goal)
+    expect(status.protein).toBe('under')
+    expect(status.kcal).toBe('over')
   })
 })

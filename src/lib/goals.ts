@@ -305,3 +305,28 @@ export function computeDayBoundsStatus(
     carbs: nutrientBoundStatus(eaten.carbs, settings.minCarbs, max.maxCarbs),
   }
 }
+
+/**
+ * Цвет цифры дня — одно правило для дневника и статистики (владелица,
+ * 2026-09-29): по каждому из ккал/Б/Ж/У отдельно. Есть хоть одна граница
+ * по этому нутриенту — по границам (недобор / внутри / перебор); границ
+ * нет, но есть цель — перебор, если съела больше цели, иначе «внутри»
+ * (недобора по одной цели не бывает); нет ни того, ни другого — `null`
+ * (серый). Цель передаём в том виде, в каком её видно на экране
+ * (округлённой), чтобы «150.0/150» не краснело из-за 149,6 под капотом.
+ */
+export function computeDayStatus(
+  settings: BoundsInput | null,
+  eaten: { kcal: number; protein: number; fat: number; carbs: number },
+  activityKcal: number,
+  goal: { kcal: number; protein: number; fat: number; carbs: number } | null,
+): DayBoundsStatus {
+  const bounds = settings ? computeDayBoundsStatus(settings, eaten, activityKcal) : null
+  const pick = (key: keyof DayBoundsStatus): BoundStatus | null => {
+    const byBounds = bounds?.[key] ?? null
+    if (byBounds) return byBounds
+    if (goal) return eaten[key] > goal[key] ? 'over' : 'ok'
+    return null
+  }
+  return { kcal: pick('kcal'), protein: pick('protein'), fat: pick('fat'), carbs: pick('carbs') }
+}
