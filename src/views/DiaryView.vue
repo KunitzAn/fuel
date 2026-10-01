@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Calendar, Search, Settings } from '@lucide/vue'
+import { Calendar, ChevronDown, Search, Settings } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import DayPickerSheet from '../components/DayPickerSheet.vue'
@@ -58,6 +58,8 @@ const activityGoal = computed(() =>
 // простановки, не пересчитывается сам (см. db/schema.ts). Складывается с
 // activityGoal независимо от активности.
 const dayType = computed(() => allDayTypes.value.find((d) => d.date === date.value) ?? null)
+const dayTypeOpen = ref(false)
+const DAY_TYPE_LABEL = { normal: 'обычный', high: 'высокоугл.', low: 'низкоугл.' } as const
 // Переключатель в шапке (владелица, после этапа 6): «Факт» — цель с
 // прибавкой за тренировки/ручную активность; «План» — цель с поправкой
 // запланированного типа дня, без прибавки за активность. Цифры «/цель» и
@@ -242,49 +244,56 @@ onBeforeRouteLeave((to) => {
     <WeekStrip :date="date" :dates-with-entries="datesWithEntries" @select="selectDate" />
 
     <!-- Тип дня (этап 4.4, не из README) — план с утра, факт в конце.
-         Независимые отметки: план влияет на ориентир ниже, факт — только
-         метка (в общую статистику пойдёт, когда она появится в этапе 6). -->
+         Свёрнут по умолчанию (владелица): в заголовке — что выбрано,
+         тап разворачивает чипы. -->
     <div class="flex flex-col gap-1.5">
-      <div class="flex items-center gap-2">
-        <span class="text-[11px] text-muted w-9 shrink-0">План</span>
-        <div class="flex gap-1 text-xs flex-1">
-          <button type="button" @click="pickPlan(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.planned ? 'bg-accent text-white' : 'glass text-muted'">
-            Обычный
-          </button>
-          <button
-            type="button"
-            :disabled="!activityGoal"
-            @click="pickPlan('high')"
-            class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
-            :class="dayType?.planned === 'high' ? 'bg-accent text-white' : 'glass text-muted'"
-          >
-            Высокоугл.
-          </button>
-          <button
-            type="button"
-            :disabled="!activityGoal"
-            @click="pickPlan('low')"
-            class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
-            :class="dayType?.planned === 'low' ? 'bg-accent text-white' : 'glass text-muted'"
-          >
-            Низкоугл.
-          </button>
+      <button type="button" @click="dayTypeOpen = !dayTypeOpen" class="flex items-center gap-2 text-xs text-muted">
+        <span>Тип дня:</span>
+        <span class="text-ink">План — {{ DAY_TYPE_LABEL[dayType?.planned ?? 'normal'] }} · Факт — {{ DAY_TYPE_LABEL[dayType?.actual ?? 'normal'] }}</span>
+        <ChevronDown :size="14" class="ml-auto transition-transform" :class="dayTypeOpen ? 'rotate-180' : ''" />
+      </button>
+      <template v-if="dayTypeOpen">
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] text-muted w-9 shrink-0">План</span>
+          <div class="flex gap-1 text-xs flex-1">
+            <button type="button" @click="pickPlan(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.planned ? 'bg-accent text-white' : 'glass text-muted'">
+              Обычный
+            </button>
+            <button
+              type="button"
+              :disabled="!activityGoal"
+              @click="pickPlan('high')"
+              class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
+              :class="dayType?.planned === 'high' ? 'bg-accent text-white' : 'glass text-muted'"
+            >
+              Высокоугл.
+            </button>
+            <button
+              type="button"
+              :disabled="!activityGoal"
+              @click="pickPlan('low')"
+              class="flex-1 py-1.5 rounded-xl disabled:opacity-40"
+              :class="dayType?.planned === 'low' ? 'bg-accent text-white' : 'glass text-muted'"
+            >
+              Низкоугл.
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-[11px] text-muted w-9 shrink-0">Факт</span>
-        <div class="flex gap-1 text-xs flex-1">
-          <button type="button" @click="pickFact(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.actual ? 'bg-accent/45 text-ink' : 'glass text-muted'">
-            Обычный
-          </button>
-          <button type="button" @click="pickFact('high')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'high' ? 'bg-accent/45 text-ink' : 'glass text-muted'">
-            Высокоугл.
-          </button>
-          <button type="button" @click="pickFact('low')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'low' ? 'bg-accent/45 text-ink' : 'glass text-muted'">
-            Низкоугл.
-          </button>
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] text-muted w-9 shrink-0">Факт</span>
+          <div class="flex gap-1 text-xs flex-1">
+            <button type="button" @click="pickFact(null)" class="flex-1 py-1.5 rounded-xl" :class="!dayType?.actual ? 'bg-accent/45 text-ink' : 'glass text-muted'">
+              Обычный
+            </button>
+            <button type="button" @click="pickFact('high')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'high' ? 'bg-accent/45 text-ink' : 'glass text-muted'">
+              Высокоугл.
+            </button>
+            <button type="button" @click="pickFact('low')" class="flex-1 py-1.5 rounded-xl" :class="dayType?.actual === 'low' ? 'bg-accent/45 text-ink' : 'glass text-muted'">
+              Низкоугл.
+            </button>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
 
     <!-- Итоги дня прилипают к верху при прокрутке (владелица); под ними

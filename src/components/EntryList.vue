@@ -68,10 +68,11 @@ function onTouchEnd(e: TouchEvent, entry: Entry) {
       @touchmove="onTouchMove"
       @touchend="onTouchEnd($event, entry)"
     >
-      <span class="flex-1 min-w-0 flex items-start gap-1.5 text-sm text-ink">
-        <!-- Вкусняшка — значок слева от названия, с отступом -->
-        <TreatIcon v-if="entry.treat" :size="15" class="mt-0.5 shrink-0 text-treat" aria-label="Вкусняшка" />
-        <span class="min-w-0 break-words">{{ withBrand(entry.name, entry.brand) }}</span>
+      <span class="flex-1 min-w-0 text-sm text-ink break-words">{{ withBrand(entry.name, entry.brand) }}</span>
+      <!-- Вкусняшка — свой узкий столбец между названием и граммами (владелица):
+           место под значок есть в каждой строке, граммы стоят ровно -->
+      <span class="w-4 shrink-0 flex justify-center">
+        <TreatIcon v-if="entry.treat" :size="15" class="text-treat" aria-label="Вкусняшка" />
       </span>
       <span class="text-xs text-muted shrink-0">{{ entry.grams }} г</span>
       <span class="text-xs text-muted shrink-0 whitespace-nowrap text-right">
