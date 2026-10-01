@@ -11,8 +11,27 @@ import { runSync } from './sync'
 async function upsertDayType(date: string, patch: Partial<Omit<DayType, 'date' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'dirty'>>): Promise<void> {
   const now = new Date().toISOString()
   const existing = await db.dayTypes.get(date)
-  if (existing) {
+  if (existing && existing.deletedAt === null) {
     await db.dayTypes.update(date, { ...patch, updatedAt: now, dirty: true })
+    return
+  }
+  // Строка на эту дату была удалена (мягко) — новая отметка её «оживляет»
+  // со сброшенными старыми значениями. Раньше правка писалась в удалённую
+  // строку и оставалась невидимой: владелица не могла отметить факт за
+  // 27.09, хотя 28.09 отмечался (там строки не было вовсе).
+  if (existing) {
+    await db.dayTypes.update(date, {
+      planned: null,
+      plannedSource: null,
+      plannedDeltaProtein: null,
+      plannedDeltaFat: null,
+      plannedDeltaCarbs: null,
+      actual: null,
+      ...patch,
+      updatedAt: now,
+      deletedAt: null,
+      dirty: true,
+    })
     return
   }
   await db.dayTypes.add({
