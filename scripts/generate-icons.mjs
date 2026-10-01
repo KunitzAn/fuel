@@ -1,5 +1,5 @@
-// Иконка приложения — блестящий бургер на жёлтом фоне
-// (scripts/assets/icon-source.jpg, квадрат).
+// Иконка приложения — неоновый контурный бургер на тёмном фоне (этап 8,
+// владелица сгенерировала в Nano Banana; scripts/assets/icon-source.png, квадрат).
 // Генерирует всё, что ссылается манифест и index.html: favicon.svg (raster
 // внутри svg-обёртки — простой способ не городить растровый .ico),
 // apple-touch-icon.png, icons/*.png.
@@ -11,21 +11,21 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const publicDir = path.join(__dirname, '..', 'public')
-const sourceJpg = path.join(__dirname, 'assets', 'icon-source.jpg')
+const sourcePng = path.join(__dirname, 'assets', 'icon-source.png')
 
 // Фон фото — используется как поле вокруг картинки в maskable-варианте
 // (Android может обрезать иконку в круг, поэтому там нужен запас по краям).
-const BG = '#ffc904'
+const BG = '#120e1b'
 
 async function squarePng(file, size) {
-  await sharp(sourceJpg).resize(size, size).png().toFile(path.join(publicDir, file))
+  await sharp(sourcePng).resize(size, size).png().toFile(path.join(publicDir, file))
   console.log('generated', file)
 }
 
 /** Контент занимает ~72% канвы — безопасная зона под маску-круг Android. */
 async function maskablePng(file, size) {
   const inner = Math.round(size * 0.72)
-  const mark = await sharp(sourceJpg).resize(inner, inner).png().toBuffer()
+  const mark = await sharp(sourcePng).resize(inner, inner).png().toBuffer()
   await sharp({ create: { width: size, height: size, channels: 4, background: BG } })
     .composite([{ input: mark, gravity: 'center' }])
     .png()
@@ -38,7 +38,7 @@ await mkdir(path.join(publicDir, 'icons'), { recursive: true })
 // favicon.svg: <image> с встроенным base64 — вкладки браузера принимают
 // svg-иконки и с растровым содержимым внутри, отдельный .ico не нужен.
 const faviconSize = 64
-const faviconPng = await sharp(sourceJpg).resize(faviconSize, faviconSize).png().toBuffer()
+const faviconPng = await sharp(sourcePng).resize(faviconSize, faviconSize).png().toBuffer()
 const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${faviconSize}" height="${faviconSize}"><image width="${faviconSize}" height="${faviconSize}" href="data:image/png;base64,${faviconPng.toString('base64')}"/></svg>`
 await writeFile(path.join(publicDir, 'favicon.svg'), faviconSvg)
 console.log('generated favicon.svg')

@@ -12,10 +12,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const markPng = path.join(__dirname, '..', 'public', 'apple-touch-icon.png')
 const outDir = path.join(__dirname, '..', 'public', 'splash')
 
-// = --color-bg в src/style.css и theme-color в index.html
+// = --bg в src/style.css (этап 8) и theme-color в index.html
 const THEMES = [
-  { suffix: 'light', bg: '#f5f5f4', scheme: 'light' },
-  { suffix: 'dark', bg: '#0c0a09', scheme: 'dark' },
+  { suffix: 'light', bg: '#f4f2f8', scheme: 'light' },
+  { suffix: 'dark', bg: '#0f0e13', scheme: 'dark' },
 ]
 
 // device-width x device-height (CSS px, portrait) + DPR — актуальный модельный

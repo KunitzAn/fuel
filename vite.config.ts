@@ -30,8 +30,8 @@ export default defineConfig({
         description: 'Дневник калорий и КБЖУ',
         start_url: '/',
         display: 'standalone',
-        background_color: '#f5f5f4',
-        theme_color: '#f5f5f4',
+        background_color: '#f4f2f8',
+        theme_color: '#f4f2f8',
         icons: [
           {
             src: 'icons/icon-192.png',
