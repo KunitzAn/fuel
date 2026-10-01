@@ -334,9 +334,10 @@ onBeforeRouteLeave((to) => {
           </div>
         </div>
         <!-- Сколько из съеденного — «не основная» еда (lib/treat.ts) -->
-        <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-3 text-xs text-muted">
-          <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 align-middle bg-treat/15 text-treat"><TreatIcon :size="12" />{{ TREAT_LABEL_PLURAL }}</span> {{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) ·
-          Ж {{ dayTreat.fat.toFixed(1) }} · У {{ dayTreat.carbs.toFixed(1) }} · Б {{ dayTreat.protein.toFixed(1) }}
+        <!-- flex + items-center: плашка и цифры на одной линии (владелица) -->
+        <p v-if="dayTreat.kcal > 0" class="col-span-4 mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
+          <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-treat/15 text-treat"><TreatIcon :size="12" />{{ TREAT_LABEL_PLURAL }}</span>
+          <span>{{ Math.round(dayTreat.kcal) }} ккал ({{ Math.round((dayTreat.kcal / dayTotals.kcal) * 100) }}%) · Ж {{ dayTreat.fat.toFixed(1) }} · У {{ dayTreat.carbs.toFixed(1) }} · Б {{ dayTreat.protein.toFixed(1) }}</span>
         </p>
       </div>
 

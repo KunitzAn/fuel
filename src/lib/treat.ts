@@ -6,6 +6,6 @@
 /** Галочка на записи. В строке дневника — только значок. */
 export const TREAT_LABEL = 'Вкусняшка'
 /** Итоги в шапке дня и в статистике. */
-export const TREAT_LABEL_PLURAL = 'Вкусняшки'
+export const TREAT_LABEL_PLURAL = 'Вкусняхи'
 // Контурная иконка конфеты в розовом (владелица попросила вместо эмодзи 🍬)
 export { Candy as TreatIcon } from '@lucide/vue'
