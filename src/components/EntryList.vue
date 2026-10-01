@@ -9,7 +9,14 @@ import { withBrand } from '../lib/pick'
 import { TreatIcon } from '../lib/treat'
 import GramsEditSheet from './GramsEditSheet.vue'
 
-const props = defineProps<{ entries: Entry[] }>()
+const props = defineProps<{
+  entries: Entry[]
+  dayKcal: number // для доли «5%» у каждого продукта — как в шапке приёма
+}>()
+
+function sharePercent(kcal: number) {
+  return props.dayKcal > 0 ? Math.round((kcal / props.dayKcal) * 100) : 0
+}
 
 const SWIPE_THRESHOLD = 80
 const editingEntry = ref<Entry | null>(null)
@@ -60,7 +67,7 @@ function onTouchEnd(e: TouchEvent, entry: Entry) {
     <li
       v-for="entry in entries"
       :key="entry.id"
-      class="flex items-center gap-3 px-4 py-2.5 border-t border-line first:border-t-0 active:bg-bg"
+      class="px-4 py-2.5 border-t border-line first:border-t-0 active:bg-bg"
       role="button"
       tabindex="0"
       @click="editingEntry = entry"
@@ -68,16 +75,30 @@ function onTouchEnd(e: TouchEvent, entry: Entry) {
       @touchmove="onTouchMove"
       @touchend="onTouchEnd($event, entry)"
     >
-      <span class="flex-1 min-w-0 text-sm text-ink break-words">{{ withBrand(entry.name, entry.brand) }}</span>
-      <!-- Вкусняшка — свой узкий столбец между названием и граммами (владелица):
-           место под значок есть в каждой строке, граммы стоят ровно -->
-      <span class="w-4 shrink-0 flex justify-center">
-        <TreatIcon v-if="entry.treat" :size="15" class="text-treat" aria-label="Вкусняшка" />
-      </span>
-      <span class="text-xs text-muted shrink-0">{{ entry.grams }} г</span>
-      <span class="text-xs text-muted shrink-0 whitespace-nowrap text-right">
-        {{ Math.round(entryTotal(entry).kcal) }} ккал
-      </span>
+      <div class="flex items-center gap-3">
+        <span class="flex-1 min-w-0 text-sm text-ink break-words">{{ withBrand(entry.name, entry.brand) }}</span>
+        <!-- Вкусняшка — свой узкий столбец между названием и граммами (владелица):
+             место под значок есть в каждой строке, граммы стоят ровно -->
+        <span class="w-4 shrink-0 flex justify-center">
+          <TreatIcon v-if="entry.treat" :size="15" class="text-treat" aria-label="Вкусняшка" />
+        </span>
+        <span class="text-xs text-muted shrink-0">{{ entry.grams }} г</span>
+        <span class="text-xs text-muted shrink-0 whitespace-nowrap text-right">
+          {{ Math.round(entryTotal(entry).kcal) }} ккал
+        </span>
+      </div>
+      <!-- Ж · У · Б · доля ккал дня у каждого продукта, как в FatSecret
+           (владелица). Те же столбцы, что в шапке приёма: сетка на 4 и
+           справа место под шеврон (w-4 + gap-3), чтобы цифры стояли под цифрами -->
+      <div class="flex gap-3 mt-1">
+        <span class="flex-1 grid grid-cols-4 text-xs text-muted tabular-nums">
+          <span>{{ entryTotal(entry).fat.toFixed(1) }}</span>
+          <span>{{ entryTotal(entry).carbs.toFixed(1) }}</span>
+          <span>{{ entryTotal(entry).protein.toFixed(1) }}</span>
+          <span>{{ sharePercent(entryTotal(entry).kcal) }}%</span>
+        </span>
+        <span class="w-4 shrink-0" />
+      </div>
     </li>
   </ul>
 

@@ -76,7 +76,7 @@ function addSnack() {
 
     <template v-if="expanded">
       <div class="border-t border-line">
-        <EntryList :entries="entries" />
+        <EntryList :entries="entries" :day-kcal="dayKcal" />
       </div>
       <button
         type="button"

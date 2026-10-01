@@ -110,7 +110,7 @@ function remove() {
     </div>
 
     <div v-if="expanded" class="border-t border-line">
-      <EntryList :entries="entries" />
+      <EntryList :entries="entries" :day-kcal="dayKcal" />
     </div>
   </section>
 </template>
