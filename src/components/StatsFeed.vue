@@ -58,7 +58,7 @@ function signed(n: number): string {
       :data-date="row.date"
       type="button"
       @click="router.push(`/day/${row.date}`)"
-      class="w-full grid grid-cols-[2.75rem_repeat(6,minmax(0,1fr))] gap-x-1 py-2 border-b border-line text-right tabular-nums active:bg-card"
+      class="w-full grid grid-cols-[2.75rem_repeat(6,minmax(0,1fr))] items-center gap-x-1 py-2 border-b border-line text-right tabular-nums active:bg-card"
     >
       <!-- Как в FatSecret (владелица): число крупно, день недели под ним;
            месяц — в липкой шапке страницы (StatsView), не в строке -->
@@ -69,21 +69,11 @@ function signed(n: number): string {
 
       <span v-if="!row.hasEntries" class="col-span-6 self-center text-center text-xs text-muted">— нет записей —</span>
       <template v-else>
-        <span class="leading-tight">
-          <span class="block text-[13px] font-semibold text-fat">{{ int(row.eaten.fat) }}</span>
-          <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.fat) }}<template v-if="row.goal.fatChanged">⚡</template></span>
-        </span>
-        <span class="leading-tight">
-          <span class="block text-[13px] font-semibold text-carbs">{{ int(row.eaten.carbs) }}</span>
-          <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.carbs) }}<template v-if="row.goal.carbsChanged">⚡</template></span>
-        </span>
-        <span class="leading-tight">
-          <span class="block text-[13px] font-semibold text-protein">{{ int(row.eaten.protein) }}</span>
-          <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.protein) }}<template v-if="row.goal.proteinChanged">⚡</template></span>
-        </span>
-        <span class="leading-tight">
-          <span class="block text-[13px] font-semibold text-kcal">{{ int(row.eaten.kcal) }}</span>
-        </span>
+        <!-- Только факт, без цели дня (владелица) -->
+        <span class="text-[13px] font-semibold text-fat">{{ int(row.eaten.fat) }}</span>
+        <span class="text-[13px] font-semibold text-carbs">{{ int(row.eaten.carbs) }}</span>
+        <span class="text-[13px] font-semibold text-protein">{{ int(row.eaten.protein) }}</span>
+        <span class="text-[13px] font-semibold text-kcal">{{ int(row.eaten.kcal) }}</span>
         <span class="text-[13px] text-ink">{{ row.spentKcal === null ? '—' : int(row.spentKcal) }}</span>
         <span class="text-[13px] text-ink">{{ row.differenceKcal === null ? '—' : signed(row.differenceKcal) }}</span>
       </template>

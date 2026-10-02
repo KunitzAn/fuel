@@ -71,15 +71,15 @@ const monthLabel = computed(() => {
         <button type="button" @click="tab = 'charts'" class="flex-1 py-2 rounded-xl" :class="tab === 'charts' ? 'bg-accent text-white' : 'text-muted'">Графики</button>
       </div>
       <p v-if="tab === 'feed'" class="mt-3 text-sm font-semibold text-ink">{{ monthLabel }}</p>
-      <!-- Подписи столбцов строчными (владелица) -->
+      <!-- Подписи столбцов строчными и без «г» (владелица) -->
       <div
         v-if="tab === 'feed'"
         class="mt-1 grid grid-cols-[2.75rem_repeat(6,minmax(0,1fr))] gap-x-1 py-2 text-[11px] text-muted text-right border-b border-line"
       >
         <span class="text-left">день</span>
-        <span>ж, г</span>
-        <span>у, г</span>
-        <span>б, г</span>
+        <span>ж</span>
+        <span>у</span>
+        <span>б</span>
         <span>ккал</span>
         <span>расход</span>
         <span>разн.</span>
