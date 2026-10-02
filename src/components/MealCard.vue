@@ -46,7 +46,7 @@ function addSnack() {
           <component :is="MEAL_ICON[meal]" :size="16" class="text-(--card-color)" />
         </span>
         <h3 class="text-sm font-semibold text-ink flex-1">{{ MEAL_LABELS[meal] }}</h3>
-        <span class="text-sm text-muted">{{ Math.round(totals.kcal) }} ккал</span>
+        <span class="text-sm text-muted">{{ Math.round(totals.kcal) }}</span>
         <RouterLink
           :to="`/day/${date}/add/${meal}`"
           aria-label="Добавить"
@@ -76,7 +76,7 @@ function addSnack() {
 
     <template v-if="expanded">
       <div class="border-t border-line">
-        <EntryList :entries="entries" :day-kcal="dayKcal" />
+        <EntryList :entries="entries" />
       </div>
       <button
         type="button"

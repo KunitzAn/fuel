@@ -73,7 +73,7 @@ function remove() {
         <button v-else type="button" @click="startRename" class="text-sm font-semibold text-ink flex-1 text-left">
           {{ snack.name }}
         </button>
-        <span class="text-sm text-muted">{{ Math.round(totals.kcal) }} ккал</span>
+        <span class="text-sm text-muted">{{ Math.round(totals.kcal) }}</span>
         <button
           type="button"
           aria-label="Удалить перекус"
@@ -110,7 +110,7 @@ function remove() {
     </div>
 
     <div v-if="expanded" class="border-t border-line">
-      <EntryList :entries="entries" :day-kcal="dayKcal" />
+      <EntryList :entries="entries" />
     </div>
   </section>
 </template>

@@ -4,7 +4,7 @@
 // уже локально (Dexie) — «порции» только про то, сколько строк рисовать.
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { formatDayShort, WEEKDAY_LABELS } from '../lib/date'
+import { WEEKDAY_LABELS } from '../lib/date'
 import { datesBackwards, type DaySummary } from '../lib/stats'
 
 const props = defineProps<{
@@ -39,8 +39,7 @@ onBeforeUnmount(() => observer?.disconnect())
 
 function weekday(date: string): string {
   const [y, m, d] = date.split('-').map(Number)
-  const label = WEEKDAY_LABELS[(new Date(y!, m! - 1, d!).getDay() + 6) % 7]!
-  return label.charAt(0).toUpperCase() + label.slice(1)
+  return WEEKDAY_LABELS[(new Date(y!, m! - 1, d!).getDay() + 6) % 7]!
 }
 const int = (n: number) => Math.round(n).toLocaleString('ru-RU')
 function signed(n: number): string {
@@ -56,13 +55,16 @@ function signed(n: number): string {
     <button
       v-for="row in rows"
       :key="row.date"
+      :data-date="row.date"
       type="button"
       @click="router.push(`/day/${row.date}`)"
       class="w-full grid grid-cols-[2.75rem_repeat(6,minmax(0,1fr))] gap-x-1 py-2 border-b border-line text-right tabular-nums active:bg-card"
     >
+      <!-- Как в FatSecret (владелица): число крупно, день недели под ним;
+           месяц — в липкой шапке страницы (StatsView), не в строке -->
       <span class="text-left leading-tight">
-        <span class="block text-xs text-ink">{{ weekday(row.date) }}</span>
-        <span class="block text-[11px] text-muted">{{ row.date === today ? 'сегодня' : formatDayShort(row.date) }}</span>
+        <span class="block text-[15px] font-semibold text-ink">{{ Number(row.date.slice(8)) }}</span>
+        <span class="block text-[11px] text-muted">{{ weekday(row.date) }}</span>
       </span>
 
       <span v-if="!row.hasEntries" class="col-span-6 self-center text-center text-xs text-muted">— нет записей —</span>
@@ -81,7 +83,6 @@ function signed(n: number): string {
         </span>
         <span class="leading-tight">
           <span class="block text-[13px] font-semibold text-kcal">{{ int(row.eaten.kcal) }}</span>
-          <span v-if="row.goal" class="block text-[11px] text-muted">/{{ int(row.goal.kcal) }}</span>
         </span>
         <span class="text-[13px] text-ink">{{ row.spentKcal === null ? '—' : int(row.spentKcal) }}</span>
         <span class="text-[13px] text-ink">{{ row.differenceKcal === null ? '—' : signed(row.differenceKcal) }}</span>
