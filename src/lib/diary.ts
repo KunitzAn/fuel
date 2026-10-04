@@ -38,7 +38,7 @@ export function targetLabel(t: MealTarget): string {
  * Снимок КБЖУ берём на этот момент — дальнейшая правка продукта прошлые
  * записи не трогает (README «Правка и удаление»).
  */
-export async function addEntry(item: PickItem, date: string, target: MealTarget, grams: number): Promise<void> {
+export async function addEntry(item: PickItem, date: string, target: MealTarget, grams: number, treat = false): Promise<void> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   await db.entries.add({
@@ -55,7 +55,7 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
     carbs: item.carbs,
     kcal: item.kcal,
     grams,
-    treat: false,
+    treat,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -65,6 +65,23 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
   // найдутся по последней записи с этим catalogId.
   if (item.foodId) await rememberLastGrams(item.foodId, grams)
   void runSync()
+}
+
+/**
+ * Галочка «Вкусняшка» при добавлении (владелица): отмечена, если в последней
+ * записи этого продукта она стояла. Снять можно вручную — и тогда в
+ * следующий раз она будет снята: помним последний выбор, а не «хоть раз».
+ * Удалённые записи не в счёт — там могла быть ошибка.
+ */
+export async function lastTreatChoice(item: PickItem): Promise<boolean> {
+  const rows = item.foodId
+    ? await db.entries.where('foodId').equals(item.foodId).toArray()
+    : await db.entries
+        .filter((e) => (item.catalogId ? e.catalogId === item.catalogId : !e.foodId && !e.catalogId && e.name === item.name))
+        .toArray()
+  let last: (typeof rows)[number] | undefined
+  for (const e of rows) if (e.deletedAt === null && (!last || e.createdAt > last.createdAt)) last = e
+  return last?.treat === true
 }
 
 export async function updateEntryGrams(id: string, grams: number, treat?: boolean): Promise<void> {

@@ -11,7 +11,7 @@ import { fetchCatalogByBarcode } from '../lib/barcode'
 import { useCatalogSearch } from '../lib/catalog'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
 import { db, type Entry } from '../lib/db'
-import { addEntry, targetLabel, type MealTarget } from '../lib/diary'
+import { addEntry, lastTreatChoice, targetLabel, type MealTarget } from '../lib/diary'
 import { pickFromCatalog, pickFromEntry, pickFromFood, withBrand, type PickItem } from '../lib/pick'
 import { matchesQuery } from '../lib/search'
 import { useLiveQuery } from '../lib/useLiveQuery'
@@ -150,7 +150,8 @@ const searchBlocks = computed(() => {
 // открыт без записи в истории браузера (прямая ссылка, перезагрузка) —
 // back() тогда улетает в about:blank, поймала на тесте.
 async function quickAdd(item: PickItem) {
-  await addEntry(item, props.date, target.value, item.lastGrams ?? 100)
+  // Без окна граммов — и «Вкусняшка» как в прошлый раз (lastTreatChoice)
+  await addEntry(item, props.date, target.value, item.lastGrams ?? 100, await lastTreatChoice(item))
   void router.push(`/day/${props.date}`)
 }
 
@@ -221,7 +222,7 @@ function setSelectionGrams(item: PickItem, grams: number) {
 }
 async function bulkAdd() {
   for (const { item, grams } of selection.value.values()) {
-    if (grams > 0) await addEntry(item, props.date, target.value, grams)
+    if (grams > 0) await addEntry(item, props.date, target.value, grams, await lastTreatChoice(item))
   }
   selection.value = new Map()
   selectMode.value = false

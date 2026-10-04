@@ -5,9 +5,10 @@
 import { ChevronDown, Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { db } from '../lib/db'
-import { addEntry, targetLabel, type MealTarget } from '../lib/diary'
+import { addEntry, lastTreatChoice, targetLabel, type MealTarget } from '../lib/diary'
 import { parseDecimal, scaleByGrams } from '../lib/nutrition'
 import { pickFromFood, type PickItem } from '../lib/pick'
+import { TREAT_LABEL, TreatIcon } from '../lib/treat'
 import FoodFormSheet from './FoodFormSheet.vue'
 import MealTargetSheet from './MealTargetSheet.vue'
 
@@ -31,6 +32,16 @@ function clearOnFocus() {
   if (gramsInput.value === String(defaultGrams)) gramsInput.value = ''
 }
 const target = ref<MealTarget>(props.target)
+
+// Вкусняшку можно отметить сразу при добавлении (владелица); по умолчанию —
+// как в последней записи этого продукта (lib/diary.ts lastTreatChoice).
+// Пока ищем, галочку не трогали — если её успели тронуть, не перебиваем
+const treat = ref(false)
+let treatTouched = false
+const touchTreat = () => (treatTouched = true)
+void lastTreatChoice(props.item).then((v) => {
+  if (!treatTouched) treat.value = v
+})
 const pickingTarget = ref(false)
 
 const per100 = computed(() => ({
@@ -48,7 +59,7 @@ function pickTarget(t: MealTarget) {
 
 async function add() {
   if (grams.value <= 0) return
-  await addEntry(props.item, props.date, target.value, grams.value)
+  await addEntry(props.item, props.date, target.value, grams.value, treat.value)
   emit('added')
 }
 
@@ -60,7 +71,7 @@ async function onFoodSaved(id: string, addNow: boolean) {
   editingFood.value = false
   const food = addNow ? await db.foods.get(id) : undefined
   if (food && grams.value > 0) {
-    await addEntry(pickFromFood(food), props.date, target.value, grams.value)
+    await addEntry(pickFromFood(food), props.date, target.value, grams.value, treat.value)
     emit('added')
   } else {
     emit('close')
@@ -115,6 +126,12 @@ function onFoodDeleted() {
         Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} · Б {{ scaled.protein.toFixed(1) }} ·
         {{ Math.round(scaled.kcal) }} ккал
       </p>
+
+      <label class="flex items-center gap-2 text-sm text-ink">
+        <input v-model="treat" type="checkbox" class="h-4 w-4 accent-accent shrink-0" @change="touchTreat" />
+        <TreatIcon :size="16" class="text-treat" />
+        {{ TREAT_LABEL }}
+      </label>
 
       <div class="flex gap-2">
         <button
