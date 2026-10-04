@@ -10,14 +10,24 @@ export interface Me {
 // Pinia ради одного объекта не нужна.
 export const me = ref<Me | null>(null)
 export const authChecked = ref(false)
+/**
+ * Сервер точно сказал «не вошли» (401) или нажали «Выйти». Не путать с
+ * `me === null`: так бывает и офлайн, когда сессию просто не проверить —
+ * по этому флагу роутер отправляет на экран входа (router.ts).
+ */
+export const signedOut = ref(false)
 
 export async function checkSession(): Promise<Me | null> {
   try {
     me.value = await api.get<Me>('/api/me')
+    signedOut.value = false
   } catch (err) {
     // Сбрасываем только на настоящий «не вошли» (401). Нет сети/таймаут —
     // не повод разлогинивать: оставляем то, что уже знали.
-    if (err instanceof ApiError && err.status === 401) me.value = null
+    if (err instanceof ApiError && err.status === 401) {
+      me.value = null
+      signedOut.value = true
+    }
   } finally {
     authChecked.value = true
   }
@@ -31,6 +41,7 @@ export async function requestLoginCode(email: string): Promise<void> {
 export async function verifyLoginCode(email: string, code: string): Promise<void> {
   me.value = await api.post<Me>('/api/auth/verify-code', { email, code })
   authChecked.value = true
+  signedOut.value = false
   rememberEmail(me.value.email)
 }
 
@@ -58,4 +69,5 @@ export function lastLoginEmail(): string {
 export async function logout(): Promise<void> {
   await api.post('/api/auth/logout')
   me.value = null
+  signedOut.value = true
 }

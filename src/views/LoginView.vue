@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ArrowLeft } from '@lucide/vue'
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '../lib/api'
 import { lastLoginEmail, requestLoginCode, verifyLoginCode } from '../lib/auth'
 import { runSync } from '../lib/sync'
 
 const router = useRouter()
+const route = useRoute()
 
 // Почта прошлого входа на этом устройстве — сразу в поле, остаётся нажать «Прислать код».
 const email = ref(lastLoginEmail())
@@ -36,7 +36,9 @@ async function submitCode() {
   try {
     await verifyLoginCode(email.value.trim(), code.value.trim())
     void runSync()
-    router.push('/settings')
+    // Сразу в дневник (владелица) — или туда, куда шли до входа
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/'
+    void router.replace(redirect)
   } catch (err) {
     errorMessage.value =
       err instanceof ApiError && err.status === 400
@@ -57,21 +59,15 @@ function resend() {
 <template>
   <main class="min-h-dvh p-6 flex justify-center bg-bg">
     <div class="w-full max-w-md flex flex-col gap-6 pt-[env(safe-area-inset-top)]">
-      <header class="flex items-center gap-3">
-        <button
-          type="button"
-          @click="router.push('/settings')"
-          class="w-10 h-10 rounded-full glass flex items-center justify-center shrink-0"
-        >
-          <ArrowLeft :size="20" class="text-ink" />
-        </button>
-        <h1 class="text-lg font-semibold text-ink">Вход</h1>
+      <!-- Без кнопки «назад»: без входа в приложении идти некуда (router.ts) -->
+      <header class="pt-6 flex items-center gap-3">
+        <img src="/apple-touch-icon.png" alt="" class="w-12 h-12 rounded-xl" />
+        <h1 class="text-2xl font-bold text-ink">Fuel</h1>
       </header>
 
       <template v-if="step === 'email'">
         <p class="text-sm text-muted">
-          Без пароля — пришлём код на почту, введёте его здесь. Пригодится, если открываете
-          Fuel на новом устройстве.
+          Вход без пароля: пришлём код на почту, введёте его здесь.
         </p>
         <input
           v-model="email"

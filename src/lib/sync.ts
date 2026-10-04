@@ -95,7 +95,8 @@ async function setLastSyncedAt(value: string): Promise<void> {
   await db.settings.put({ key: LAST_SYNCED_AT_KEY, value })
 }
 
-async function getSyncedUserId(): Promise<number | null> {
+/** Чей дневник лежит на устройстве (после первого синка); null — ничей. */
+export async function getSyncedUserId(): Promise<number | null> {
   const row = await db.settings.get(SYNCED_USER_ID_KEY)
   return row ? Number(row.value) : null
 }

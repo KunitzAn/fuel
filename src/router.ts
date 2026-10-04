@@ -1,4 +1,7 @@
+import { watch } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import { checkSession, me, signedOut } from './lib/auth'
+import { getSyncedUserId } from './lib/sync'
 import AddFoodView from './views/AddFoodView.vue'
 import DiaryView from './views/DiaryView.vue'
 import LoginView from './views/LoginView.vue'
@@ -36,4 +39,47 @@ export const router = createRouter({
     // PWA не со start_url, а, например, с /index.html)
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
+})
+
+// Без входа — сразу на экран почты (владелица, 04.10: раньше открывался
+// пустой дневник, в который ничего не добавить). После входа LoginView
+// возвращает туда, куда шли (`redirect`), по умолчанию — в дневник.
+//
+// Офлайн-first не ломаем: если на устройстве уже есть дневник (был синк),
+// пускаем сразу, не дожидаясь сети — на iOS в авиарежиме запрос висит.
+// Сессию проверяем фоном; ответит сервер 401 — `signedOut`, и watch ниже
+// уведёт на вход. Устройство без дневника — ждём ответа сервера.
+const FIRST_CHECK_TIMEOUT_MS = 6000
+
+function toLogin(fullPath: string) {
+  return { name: 'login', query: fullPath === '/' ? {} : { redirect: fullPath } }
+}
+
+function checkSessionWithTimeout() {
+  return Promise.race([
+    checkSession(),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), FIRST_CHECK_TIMEOUT_MS)),
+  ])
+}
+
+router.beforeEach(async (to) => {
+  // Уже вошла и открыла экран входа (например, перезагрузка на нём) — в дневник
+  if (to.name === 'login') {
+    if (me.value) return '/'
+    if (signedOut.value) return true
+    return (await checkSessionWithTimeout()) ? '/' : true
+  }
+  if (signedOut.value) return toLogin(to.fullPath)
+  if (me.value) return true
+  if ((await getSyncedUserId()) !== null) {
+    void checkSession()
+    return true
+  }
+  return (await checkSessionWithTimeout()) ? true : toLogin(to.fullPath)
+})
+
+// «Выйти» или сессия протухла посреди работы — на вход; после входа — в
+// дневник, а не обратно в Настройки, откуда выходили
+watch(signedOut, (out) => {
+  if (out && router.currentRoute.value.name !== 'login') void router.replace(toLogin('/'))
 })
