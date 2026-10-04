@@ -1,21 +1,25 @@
 <script setup lang="ts">
-// Столбики по дням + чёрточка цели (README «Графики»). Своё SVG, без
-// библиотеки: 7–92 столбика, ничего интерактивнее тапа не нужно. Цвет
-// столбиков — цвет нутриента (этап 8), статусом больше не красим.
-// `diverging` — для разницы: ноль посередине, профицит вверх, дефицит вниз.
+// Столбики по дням (README «Графики»). Обычный HTML, а не SVG: шкала слева
+// и числа над столбиками — текст, а растянутый SVG сплющил бы буквы.
+// Цвет столбиков — цвет нутриента (этап 8). Чёрточки цели нет (владелица,
+// 04.10: «пока убираем»).
+// `diverging` — для разницы: ноль посередине, перебор вверх (красный),
+// дефицит вниз (бирюзовый) — владелица выбрала ноль, подписи и два цвета.
 import { computed } from 'vue'
 
 export interface ChartBar {
   date: string
   value: number | null
-  goal: number | null
   today: boolean
 }
 
 const props = defineProps<{
   title: string
+  subtitle?: string
   bars: ChartBar[]
   selected: string | null
+  /** Числа над всеми столбиками (неделя) или только над выбранным. */
+  valuesForAll: boolean
   diverging?: boolean
   heightClass?: string
   /** Цвет столбиков — цвет нутриента (CSS-переменная). */
@@ -23,63 +27,132 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ select: [date: string] }>()
 
-const STEP = 10
-const width = computed(() => props.bars.length * STEP)
-const scale = computed(() => {
-  let max = 1
-  for (const b of props.bars) {
-    if (b.value !== null) max = Math.max(max, Math.abs(b.value))
-    if (b.goal !== null) max = Math.max(max, b.goal)
-  }
-  return max * 1.08
-})
-// y в координатах 0…100: обычный график — от низа, diverging — от середины
-function y(v: number): number {
-  return props.diverging ? 50 - (v / scale.value) * 50 : 100 - (v / scale.value) * 100
+// Шаг шкалы — «круглый» (владелица: «например каждые 25 или 50»), чтобы
+// линий было не больше четырёх на сторону
+const STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000]
+function niceStep(max: number): number {
+  return STEPS.find((s) => max / s <= 4) ?? STEPS.at(-1)!
 }
-const gap = computed(() => (props.bars.length > 40 ? 1 : 2))
 
-function barRect(b: ChartBar, i: number) {
-  const v = b.value ?? 0
-  const top = props.diverging ? Math.min(y(v), 50) : y(v)
-  const bottom = props.diverging ? Math.max(y(v), 50) : 100
-  return { x: i * STEP + gap.value, width: STEP - gap.value * 2, y: top, height: Math.max(bottom - top, v === 0 ? 0 : 0.8) }
+const range = computed(() => {
+  let pos = 0
+  let neg = 0
+  for (const b of props.bars) {
+    if (b.value === null) continue
+    pos = Math.max(pos, b.value)
+    neg = Math.max(neg, -b.value)
+  }
+  const step = niceStep(Math.max(pos, neg, 1))
+  // У «разницы» всегда хотя бы по шагу в обе стороны — есть куда расти
+  // и подписям «перебор» / «дефицит»
+  const top = Math.max(Math.ceil(pos / step), 1) * step
+  const bottom = props.diverging ? Math.max(Math.ceil(neg / step), 1) * step : 0
+  return { step, top, bottom }
+})
+
+/** Положение значения по высоте, % от верха области графика. */
+function yPct(v: number): number {
+  const { top, bottom } = range.value
+  return ((top - v) / (top + bottom)) * 100
+}
+const hasData = computed(() => props.bars.some((b) => b.value !== null))
+const ticks = computed(() => {
+  if (!hasData.value) return [0] // пустой период — только линия нуля
+  const { step, top, bottom } = range.value
+  const out: number[] = []
+  for (let v = -bottom; v <= top; v += step) out.push(v || 0)
+  return out
+})
+
+// `|| 0` — иначе нижняя линия шкалы подписывалась «−0»
+const int = (n: number) => (Math.round(n) || 0).toLocaleString('ru-RU')
+function label(n: number): string {
+  if (!props.diverging) return int(n)
+  const r = Math.round(n) || 0
+  return r > 0 ? `+${int(r)}` : r < 0 ? `−${int(-r)}` : '0'
+}
+
+function barStyle(v: number) {
+  const zero = yPct(0)
+  const at = yPct(v)
+  return { top: `${Math.min(zero, at)}%`, height: `${Math.max(Math.abs(at - zero), v === 0 ? 0 : 0.8)}%` }
+}
+function barColor(v: number): string {
+  if (!props.diverging) return props.color ?? 'var(--muted)'
+  return v > 0 ? 'var(--activity)' : 'var(--snack)'
+}
+// Число над столбиком (под ним — у дефицита). Узкие столбики (месяц и
+// дольше) у краёв — не по центру, а прижато внутрь, чтобы не вылезало
+function valueStyle(v: number, i: number) {
+  const n = props.bars.length
+  const edge = n > 14 && (i < n * 0.15 || i >= n * 0.85)
+  const x = !edge ? 'left-1/2 -translate-x-1/2' : i < n / 2 ? 'left-0' : 'right-0'
+  const y = v < 0 ? { top: `calc(${yPct(v)}% + 2px)` } : { bottom: `calc(${100 - yPct(v)}% + 2px)` }
+  return { cls: x, style: y }
+}
+function showValue(b: ChartBar) {
+  return b.value !== null && (props.valuesForAll || b.date === props.selected)
 }
 </script>
 
 <template>
   <section class="rounded-2xl glass p-3">
-    <div class="flex items-baseline justify-between mb-1.5">
-      <h3 class="text-xs font-semibold text-ink">{{ title }}</h3>
-      <span class="text-[10px] text-muted tabular-nums">{{ diverging ? '±' : '' }}{{ Math.round(scale / 1.08).toLocaleString('ru-RU') }}</span>
+    <div class="flex items-baseline justify-between gap-2 mb-1">
+      <div>
+        <h3 class="text-xs font-semibold text-ink">{{ title }}</h3>
+        <p v-if="subtitle" class="text-[10px] text-muted">{{ subtitle }}</p>
+      </div>
+      <span v-if="diverging" class="text-[10px] whitespace-nowrap flex gap-2">
+        <span class="text-activity">↑ перебор</span>
+        <span class="text-snack">↓ дефицит</span>
+      </span>
     </div>
-    <svg
-      :viewBox="`0 0 ${width} 100`"
-      preserveAspectRatio="none"
-      class="w-full block"
-      :class="heightClass ?? 'h-24'"
-    >
-      <line v-if="diverging" x1="0" :x2="width" y1="50" y2="50" class="stroke-line" vector-effect="non-scaling-stroke" stroke-width="1" />
-      <line v-else x1="0" :x2="width" y1="100" y2="100" class="stroke-line" vector-effect="non-scaling-stroke" stroke-width="1" />
-      <g v-for="(b, i) in bars" :key="b.date" @click="emit('select', b.date)" class="cursor-pointer">
-        <rect :x="i * STEP" y="0" :width="STEP" height="100" :class="b.date === selected ? 'fill-line' : 'fill-transparent'" />
-        <rect
-          v-if="b.value !== null"
-          v-bind="barRect(b, i)"
-          :class="b.today ? 'opacity-40' : ''"
-          :style="{ fill: color ?? 'var(--muted)' }"
+
+    <!-- Сверху и снизу запас под числа над крайними столбиками -->
+    <div class="flex pt-4" :class="diverging ? 'pb-4' : ''">
+      <!-- Шкала слева -->
+      <div class="relative w-9 shrink-0" :class="heightClass ?? 'h-24'">
+        <span
+          v-for="t in ticks"
+          :key="t"
+          class="absolute right-1.5 -translate-y-1/2 text-[10px] leading-none text-muted tabular-nums"
+          :style="{ top: `${yPct(t)}%` }"
+        >{{ label(t) }}</span>
+      </div>
+
+      <div class="relative flex-1" :class="heightClass ?? 'h-24'">
+        <div
+          v-for="t in ticks"
+          :key="t"
+          class="absolute inset-x-0 border-t"
+          :class="t === 0 ? 'border-muted/60' : 'border-line border-dashed'"
+          :style="{ top: `${yPct(t)}%` }"
         />
-        <line
-          v-if="b.goal !== null && !diverging"
-          :x1="i * STEP + 0.5"
-          :x2="i * STEP + STEP - 0.5"
-          :y1="y(b.goal)"
-          :y2="y(b.goal)"
-          class="stroke-ink"
-          vector-effect="non-scaling-stroke"
-          stroke-width="2"
-        />
-      </g>
-    </svg>
+        <div class="absolute inset-0 flex">
+          <button
+            v-for="(b, i) in bars"
+            :key="b.date"
+            type="button"
+            :aria-label="b.date"
+            @click="emit('select', b.date)"
+            class="relative flex-1 h-full rounded-sm"
+            :class="b.date === selected ? 'bg-ink/8' : ''"
+          >
+            <span
+              v-if="b.value !== null"
+              class="absolute rounded-[2px]"
+              :class="[bars.length > 40 ? 'inset-x-px' : 'inset-x-[18%]', b.today ? 'opacity-40' : '']"
+              :style="{ ...barStyle(b.value), backgroundColor: barColor(b.value) }"
+            />
+            <span
+              v-if="showValue(b)"
+              class="absolute whitespace-nowrap text-[10px] leading-none font-semibold tabular-nums text-ink"
+              :class="valueStyle(b.value!, i).cls"
+              :style="valueStyle(b.value!, i).style"
+            >{{ label(b.value!) }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

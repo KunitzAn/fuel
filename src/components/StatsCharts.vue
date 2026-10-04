@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // Графики (README «Статистика → Графики»): период со стрелками, средние в
 // день и итого разница за период, калории по дням (+ разница), Б/Ж/У.
-// Тап по столбику — цифры этого дня строкой над графиками.
+// Цифры дня — прямо над столбиками (владелица, 04.10, вместо плашки над
+// графиками): за неделю — над всеми сразу, за месяц и 3 месяца — над
+// выбранным днём во всех графиках разом. Повторный тап — открыть день.
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -57,9 +59,6 @@ function barsFor(key: Key): ChartBar[] {
     return {
       date,
       value: s && s.hasEntries ? s.eaten[key] : null,
-      // Цель — только у дней с записями: иначе до начала ведения дневника
-      // тянется ряд одиноких чёрточек
-      goal: s?.hasEntries && s.goal ? s.goal[key] : null,
       today: date === props.today,
     }
   })
@@ -70,20 +69,16 @@ const differenceBars = computed<ChartBar[]>(() =>
     return {
       date,
       value: s && s.hasEntries ? s.differenceKcal : null,
-      goal: null,
       today: date === props.today,
     }
   }),
 )
 
-const selectedSummary = computed(() => {
-  if (!selected.value) return null
-  const i = period.value.dates.indexOf(selected.value)
-  return i === -1 ? null : summaries.value[i]
-})
 function select(date: string) {
-  selected.value = selected.value === date ? null : date
+  if (selected.value === date) void router.push(`/day/${date}`)
+  else selected.value = date
 }
+const valuesForAll = computed(() => kind.value === 'week')
 
 const int = (n: number) => Math.round(n).toLocaleString('ru-RU')
 function signed(n: number): string {
@@ -180,37 +175,24 @@ const axis = computed(() => {
       <p v-else class="text-sm text-muted">За этот период нет законченных дней с записями.</p>
     </section>
 
-    <div class="min-h-10 text-xs">
-      <button v-if="selectedSummary" type="button" @click="router.push(`/day/${selected}`)" class="w-full text-left rounded-xl glass px-3 py-2">
-        <span class="font-medium text-ink">{{ capitalizeFirst(formatDateWithWeekday(selectedSummary.date)) }}</span>
-        <template v-if="selectedSummary.hasEntries">
-          <span class="block text-muted mt-0.5 tabular-nums">
-            {{ int(selectedSummary.eaten.kcal) }}<template v-if="selectedSummary.goal"> / {{ int(selectedSummary.goal.kcal) }}</template> ккал
-            <template v-if="selectedSummary.spentKcal !== null">
-              · потрачено {{ int(selectedSummary.spentKcal) }} · разница {{ signed(selectedSummary.differenceKcal!) }}</template
-            >
-          </span>
-          <span class="block text-muted tabular-nums">
-            Ж {{ int(selectedSummary.eaten.fat) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.fat) }}</template>
-            · У {{ int(selectedSummary.eaten.carbs) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.carbs) }}</template>
-            · Б {{ int(selectedSummary.eaten.protein) }}<template v-if="selectedSummary.goal">/{{ int(selectedSummary.goal.protein) }}</template>
-            <span class="text-accent"> · открыть день ›</span>
-          </span>
-        </template>
-        <span v-else class="block text-muted mt-0.5">Нет записей · <span class="text-accent">открыть день ›</span></span>
-      </button>
-      <p v-else class="text-muted px-1 pt-1">Тап по столбику — цифры этого дня. Столбик — съедено, чёрточка — цель.</p>
-    </div>
+    <p class="text-xs text-muted px-1 -mb-1">
+      <template v-if="selected">
+        <span class="text-ink font-medium">{{ capitalizeFirst(formatDateWithWeekday(selected)) }}</span>
+        · ещё тап — открыть день
+      </template>
+      <template v-else-if="kind === 'week'">Тап по дню — выделить, ещё тап — открыть день</template>
+      <template v-else>Тап по столбику — цифры этого дня во всех графиках</template>
+    </p>
 
-    <StatsBarChart title="Калории, ккал" color="var(--kcal)" :bars="barsFor('kcal')" :selected="selected" height-class="h-32" @select="select" />
-    <StatsBarChart title="Разница (съедено − потрачено), ккал" color="var(--activity)" :bars="differenceBars" :selected="selected" diverging height-class="h-20" @select="select" />
-    <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 px-3">
+    <StatsBarChart title="Калории, ккал" color="var(--kcal)" :bars="barsFor('kcal')" :selected="selected" :values-for-all="valuesForAll" height-class="h-32" @select="select" />
+    <StatsBarChart title="Разница, ккал" subtitle="съедено − потрачено" :bars="differenceBars" :selected="selected" :values-for-all="valuesForAll" diverging height-class="h-28" @select="select" />
+    <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 pl-12 pr-3">
       <span v-for="(label, i) in axis" :key="i">{{ label }}</span>
     </div>
-    <StatsBarChart title="Жиры, г" color="var(--fat)" :bars="barsFor('fat')" :selected="selected" height-class="h-16" @select="select" />
-    <StatsBarChart title="Углеводы, г" color="var(--carbs)" :bars="barsFor('carbs')" :selected="selected" height-class="h-16" @select="select" />
-    <StatsBarChart title="Белки, г" color="var(--protein)" :bars="barsFor('protein')" :selected="selected" height-class="h-16" @select="select" />
-    <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 px-3">
+    <StatsBarChart title="Жиры, г" color="var(--fat)" :bars="barsFor('fat')" :selected="selected" :values-for-all="valuesForAll" height-class="h-20" @select="select" />
+    <StatsBarChart title="Углеводы, г" color="var(--carbs)" :bars="barsFor('carbs')" :selected="selected" :values-for-all="valuesForAll" height-class="h-20" @select="select" />
+    <StatsBarChart title="Белки, г" color="var(--protein)" :bars="barsFor('protein')" :selected="selected" :values-for-all="valuesForAll" height-class="h-20" @select="select" />
+    <div class="flex justify-between text-[10px] text-muted tabular-nums -mt-2 pl-12 pr-3">
       <span v-for="(label, i) in axis" :key="i">{{ label }}</span>
     </div>
   </div>
