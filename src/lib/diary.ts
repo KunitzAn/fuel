@@ -96,6 +96,13 @@ export async function softDeleteEntry(id: string): Promise<void> {
   void runSync()
 }
 
+/** «Отменить» после удаления (lib/undo.ts) — запись возвращается как была. */
+export async function restoreEntry(id: string): Promise<void> {
+  const now = new Date().toISOString()
+  await db.entries.update(id, { deletedAt: null, updatedAt: now, dirty: true })
+  void runSync()
+}
+
 /** Сортировка внутри дня/приёма — в порядке добавления (см. README «История»). */
 export function byCreatedAt(a: Entry, b: Entry): number {
   return a.createdAt.localeCompare(b.createdAt)

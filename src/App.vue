@@ -2,6 +2,7 @@
 import { watchEffect } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import TabBar from './components/TabBar.vue'
+import UndoToast from './components/UndoToast.vue'
 
 const route = useRoute()
 
@@ -22,4 +23,5 @@ watchEffect(() => {
 <template>
   <RouterView />
   <TabBar v-if="route.meta.tabBar" />
+  <UndoToast />
 </template>
