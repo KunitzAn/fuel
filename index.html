@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Без зума (владелица, 04.10: при добавлении еды страница приближалась
+         от тапов). maximum-scale=1 — iOS не зумит при фокусе в поле ввода;
+         щипок и двойной тап гасятся ещё в style.css и main.ts -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f2f8" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e13" />

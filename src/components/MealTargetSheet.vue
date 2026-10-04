@@ -16,6 +16,7 @@ const snacks = useLiveQuery(
   [],
 )
 const snacksByMeal = computed(() => ({
+  start: snacks.value.filter((s) => s.after === 'start').sort(bySnackPosition),
   breakfast: snacks.value.filter((s) => s.after === 'breakfast').sort(bySnackPosition),
   lunch: snacks.value.filter((s) => s.after === 'lunch').sort(bySnackPosition),
   dinner: snacks.value.filter((s) => s.after === 'dinner').sort(bySnackPosition),
@@ -35,6 +36,16 @@ function pickSnack(snackId: string, name: string) {
 
     <div class="relative w-full max-w-md rounded-t-3xl bg-bg px-4 pt-5 pb-8 flex flex-col gap-2 max-h-[70vh] overflow-y-auto">
       <h2 class="text-base font-semibold text-ink mb-1">Куда добавить?</h2>
+
+      <button
+        v-for="snack in snacksByMeal.start"
+        :key="snack.id"
+        type="button"
+        @click="pickSnack(snack.id, snack.name)"
+        class="rounded-2xl glass px-4 py-2.5 text-left text-sm text-ink"
+      >
+        {{ snack.name }}
+      </button>
 
       <template v-for="meal in MEALS" :key="meal">
         <button

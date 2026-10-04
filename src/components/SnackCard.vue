@@ -11,7 +11,36 @@ const props = defineProps<{
   snack: Snack
   entries: Entry[]
   dayKcal: number
+  /** Сдвиг за пальцем, пока перекус перетаскивают (DiaryView); null — не тащат. */
+  dragOffset?: number | null
 }>()
+const emit = defineEmits<{ dragStart: [y: number] }>()
+
+// Долгое нажатие — взять перекус и перетащить выше/ниже (владелица, 04.10).
+// Само перетаскивание ведёт DiaryView: оно знает порядок всех карточек.
+// Не со списка еды (там свой тап и свайп) и не с поля названия; сдвинула
+// палец раньше времени — это прокрутка, не нажатие.
+const LONG_PRESS_MS = 450
+let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null
+function onPressStart(e: TouchEvent) {
+  const t = e.touches[0]
+  if (!t || (e.target as HTMLElement).closest('ul, input')) return
+  const y = t.clientY
+  press = { x: t.clientX, y, timer: setTimeout(() => {
+    press = null
+    emit('dragStart', y)
+  }, LONG_PRESS_MS) }
+}
+function onPressMove(e: TouchEvent) {
+  // Уже тащим — страница под пальцем не прокручивается
+  if (props.dragOffset != null) e.preventDefault()
+  const t = e.touches[0]
+  if (press && t && Math.hypot(t.clientX - press.x, t.clientY - press.y) > 8) cancelPress()
+}
+function cancelPress() {
+  if (press) clearTimeout(press.timer)
+  press = null
+}
 
 const expanded = ref(false)
 const renaming = ref(false)
@@ -48,7 +77,20 @@ function remove() {
 <template>
   <!-- overflow-clip, а не hidden: hidden делает карточку контейнером
        прокрутки, и прилипающая шапка ниже перестала бы липнуть к экрану -->
-  <section class="rounded-3xl glass glow overflow-clip" style="--glow: var(--snack); --card-color: var(--snack)">
+  <section
+    class="rounded-3xl glass glow overflow-clip select-none [-webkit-touch-callout:none]"
+    :class="dragOffset != null ? 'relative z-20 shadow-2xl' : 'transition-transform'"
+    :style="{
+      '--glow': 'var(--snack)',
+      '--card-color': 'var(--snack)',
+      transform: dragOffset != null ? `translateY(${dragOffset}px) scale(1.02)` : undefined,
+    }"
+    @touchstart="onPressStart"
+    @touchmove="onPressMove"
+    @touchend="cancelPress"
+    @touchcancel="cancelPress"
+    @contextmenu.prevent
+  >
     <!-- Раскрытый приём прилипает шапкой под итогами дня, пока его список
          на экране (владелица: «если в нём много продуктов») -->
     <div

@@ -22,7 +22,7 @@ export interface Food {
 export interface Snack {
   id: string
   date: string // YYYY-MM-DD
-  after: 'breakfast' | 'lunch' | 'dinner'
+  after: 'start' | 'breakfast' | 'lunch' | 'dinner' // start — выше завтрака
   name: string
   position: number
   createdAt: string

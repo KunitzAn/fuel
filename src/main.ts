@@ -7,6 +7,12 @@ import { installSyncTriggers, runSync } from './lib/sync'
 
 installErrorOverlay()
 
+// Без зума (владелица, 04.10). Safari на iOS игнорирует user-scalable=no
+// для щипка — гасим сам жест (gesture* — только Safari)
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false })
+}
+
 // Монтируем сразу, сеть — фоном. Дневник целиком живёт в IndexedDB, для
 // показа ему сервер не нужен. Раньше тут стоял await проверки сессии (как в
 // daylens, где синк обязан был успеть до засева дефолтных категорий) — а на

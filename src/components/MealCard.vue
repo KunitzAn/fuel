@@ -4,7 +4,7 @@ import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import EntryList from './EntryList.vue'
 import type { Entry } from '../lib/db'
-import { createSnack, MEAL_GENITIVE, MEAL_LABELS, type Meal } from '../lib/diary'
+import { MEAL_LABELS, type Meal } from '../lib/diary'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 
 const props = defineProps<{
@@ -24,11 +24,6 @@ const totals = computed(() => sumMacros(props.entries.map((e) => scaleByGrams(e,
 const sharePercent = computed(() =>
   props.dayKcal > 0 ? Math.round((totals.value.kcal / props.dayKcal) * 100) : 0,
 )
-
-function addSnack() {
-  void createSnack(props.date, props.meal)
-  expanded.value = true // сразу видно новую карточку перекуса под этой
-}
 </script>
 
 <template>
@@ -74,17 +69,9 @@ function addSnack() {
       </button>
     </div>
 
-    <template v-if="expanded">
-      <div class="border-t border-line">
-        <EntryList :entries="entries" />
-      </div>
-      <button
-        type="button"
-        @click="addSnack"
-        class="w-full text-left px-4 py-2.5 text-sm text-(--card-color) border-t border-line"
-      >
-        + перекус после {{ MEAL_GENITIVE[meal] }}
-      </button>
-    </template>
+    <!-- Перекус добавляется кнопкой под приёмами, не отсюда (владелица) -->
+    <div v-if="expanded" class="border-t border-line">
+      <EntryList :entries="entries" />
+    </div>
   </section>
 </template>

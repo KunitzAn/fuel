@@ -15,12 +15,13 @@ export const MEAL_LABELS: Record<Meal, string> = {
   dinner: 'Ужин',
 }
 
-/** Родительный падеж — «перекус после завтрака/обеда/ужина» (не склоняется по правилу от именительного). */
-export const MEAL_GENITIVE: Record<Meal, string> = {
-  breakfast: 'завтрака',
-  lunch: 'обеда',
-  dinner: 'ужина',
-}
+/**
+ * Где стоит перекус: после какого приёма или `start` — выше завтрака
+ * (владелица, 04.10: перекус перетаскивается над любым приёмом, и над
+ * завтраком тоже).
+ */
+export type SnackSlot = 'start' | Meal
+export const SNACK_SLOTS: SnackSlot[] = ['start', 'breakfast', 'lunch', 'dinner']
 
 /** Куда добавляем запись — обычный приём или конкретный перекус. */
 export type MealTarget =
@@ -113,7 +114,8 @@ export function bySnackPosition(a: Snack, b: Snack): number {
   return a.position - b.position
 }
 
-export async function createSnack(date: string, after: Meal): Promise<void> {
+/** Новый перекус — кнопкой «+ Перекус» под приёмами, в самый конец дня. */
+export async function createSnack(date: string, after: SnackSlot = 'dinner'): Promise<void> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   const position = await db.snacks
@@ -122,6 +124,25 @@ export async function createSnack(date: string, after: Meal): Promise<void> {
     .and((s) => s.after === after && !s.deletedAt)
     .count()
   await db.snacks.add({ id, date, after, name: 'Перекус', position, createdAt: now, updatedAt: now, deletedAt: null, dirty: true })
+  void runSync()
+}
+
+/**
+ * Перенос перекуса (долгое нажатие и перетаскивание, DiaryView): `ordered` —
+ * все перекусы места `slot` в новом порядке, вместе с перенесённым.
+ * Пишем только тех, у кого что-то поменялось.
+ */
+export async function moveSnack(id: string, slot: SnackSlot, ordered: string[]): Promise<void> {
+  const now = new Date().toISOString()
+  await db.transaction('rw', db.snacks, async () => {
+    for (const [position, snackId] of ordered.entries()) {
+      const snack = await db.snacks.get(snackId)
+      if (!snack) continue
+      const after = snackId === id ? slot : snack.after
+      if (snack.after === after && snack.position === position) continue
+      await db.snacks.update(snackId, { after, position, updatedAt: now, dirty: true })
+    }
+  })
   void runSync()
 }
 

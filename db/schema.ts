@@ -92,7 +92,7 @@ export const snacks = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     date: text('date').notNull(), // YYYY-MM-DD, локальная дата клиента
-    after: text('after').notNull(), // 'breakfast' | 'lunch' | 'dinner'
+    after: text('after').notNull(), // 'start' (выше завтрака) | 'breakfast' | 'lunch' | 'dinner'
     name: text('name').notNull(),
     position: integer('position').notNull().default(0),
     ...syncColumns,

@@ -126,6 +126,8 @@ html {
   color-scheme: light dark;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  /* Без зума двойным тапом (владелица) — см. index.html и main.ts */
+  touch-action: manipulation;
 }
 
 body {

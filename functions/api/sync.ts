@@ -26,7 +26,7 @@ interface WireFood {
 interface WireSnack {
   id: string
   date: string
-  after: 'breakfast' | 'lunch' | 'dinner'
+  after: 'start' | 'breakfast' | 'lunch' | 'dinner' // start — выше завтрака
   name: string
   position: number
   createdAt: string

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Calendar, ChevronDown, Search, Settings } from '@lucide/vue'
+import { Calendar, ChevronDown, Plus, Search, Settings } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import DayPickerSheet from '../components/DayPickerSheet.vue'
@@ -10,8 +10,16 @@ import SnackCard from '../components/SnackCard.vue'
 import WeekStrip from '../components/WeekStrip.vue'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate, weekDates } from '../lib/date'
 import { setActualDayType, setPlannedDayType, type DayTypePlan } from '../lib/dayTypes'
-import { byCreatedAt, bySnackPosition, cleanupEmptySnacksForDate, type Meal } from '../lib/diary'
-import { db } from '../lib/db'
+import {
+  byCreatedAt,
+  bySnackPosition,
+  cleanupEmptySnacksForDate,
+  createSnack,
+  moveSnack,
+  type Meal,
+  type SnackSlot,
+} from '../lib/diary'
+import { db, type Snack } from '../lib/db'
 import {
   dayGoalWithPlan,
   effectiveMaxBounds,
@@ -170,11 +178,145 @@ const mealEntries = computed(() => ({
 }))
 
 const daySnacks = computed(() => allSnacks.value.filter((s) => s.date === date.value))
-const snacksByMeal = computed(() => ({
-  breakfast: daySnacks.value.filter((s) => s.after === 'breakfast').sort(bySnackPosition),
-  lunch: daySnacks.value.filter((s) => s.after === 'lunch').sort(bySnackPosition),
-  dinner: daySnacks.value.filter((s) => s.after === 'dinner').sort(bySnackPosition),
-}))
+// Карточки дня по порядку: перекусы выше завтрака, завтрак, его перекусы,
+// обед, … ужин, его перекусы. Плоский список — по нему считается, куда
+// встанет перетаскиваемый перекус
+type Block = { key: string; kind: 'meal'; meal: Meal } | { key: string; kind: 'snack'; snack: Snack }
+const blocks = computed<Block[]>(() => {
+  const out: Block[] = []
+  const pushSnacks = (slot: SnackSlot) => {
+    for (const snack of daySnacks.value.filter((s) => s.after === slot).sort(bySnackPosition)) {
+      out.push({ key: `snack:${snack.id}`, kind: 'snack', snack })
+    }
+  }
+  pushSnacks('start')
+  for (const meal of MEALS) {
+    out.push({ key: `meal:${meal}`, kind: 'meal', meal })
+    pushSnacks(meal)
+  }
+  return out
+})
+
+// «+ Перекус» под приёмами (владелица, 04.10: не изнутри приёма) — в конец
+// дня; потом его можно зажать и перетащить выше любого приёма
+function addSnack() {
+  void createSnack(date.value)
+}
+
+// Перетаскивание перекуса: SnackCard ловит долгое нажатие и зовёт сюда,
+// дальше палец ведём по окну. Карточка едет за пальцем, полоска
+// показывает, куда встанет; у краёв экрана страница сама прокручивается.
+const blocksEl = ref<HTMLElement | null>(null)
+interface SnackDrag {
+  id: string
+  startY: number
+  startScroll: number
+  y: number
+  scroll: number
+  /** Перед какой карточкой встанет; null — в самый конец. */
+  dropBefore: string | null
+}
+const snackDrag = ref<SnackDrag | null>(null)
+let scrollFrame = 0
+
+function snackDragOffset(id: string): number | null {
+  const d = snackDrag.value
+  return d && d.id === id ? d.y - d.startY + (d.scroll - d.startScroll) : null
+}
+
+function updateDrop() {
+  const d = snackDrag.value
+  if (!d || !blocksEl.value) return
+  const others = [...blocksEl.value.querySelectorAll<HTMLElement>('[data-block]')].filter(
+    (el) => el.dataset.block !== `snack:${d.id}`,
+  )
+  const next = others.find((el) => {
+    const r = el.getBoundingClientRect()
+    return d.y < r.top + r.height / 2
+  })
+  d.dropBefore = next?.dataset.block ?? null
+}
+
+// Полоска не нужна, если перекус встанет туда же, где стоит
+const dropIndicator = computed(() => {
+  const d = snackDrag.value
+  if (!d) return undefined
+  const list = blocks.value
+  const i = list.findIndex((b) => b.key === `snack:${d.id}`)
+  const current = list[i + 1]?.key ?? null
+  return d.dropBefore === current ? undefined : d.dropBefore
+})
+
+function autoScroll() {
+  const d = snackDrag.value
+  if (!d) return
+  const top = (dayHeaderEl.value?.getBoundingClientRect().bottom ?? 0) + 60
+  const bottom = window.innerHeight - 140 // таб-бар
+  const speed = d.y < top ? -Math.min(14, (top - d.y) / 4) : d.y > bottom ? Math.min(14, (d.y - bottom) / 4) : 0
+  if (speed) {
+    window.scrollBy(0, speed)
+    d.scroll = window.scrollY
+    updateDrop()
+  }
+  scrollFrame = requestAnimationFrame(autoScroll)
+}
+
+function onSnackDragMove(e: TouchEvent) {
+  const d = snackDrag.value
+  const t = e.touches[0]
+  if (!d || !t) return
+  e.preventDefault()
+  d.y = t.clientY
+  updateDrop()
+}
+
+function stopSnackDrag() {
+  cancelAnimationFrame(scrollFrame)
+  window.removeEventListener('touchmove', onSnackDragMove)
+  window.removeEventListener('touchend', dropSnack)
+  window.removeEventListener('touchcancel', stopSnackDrag)
+  snackDrag.value = null
+}
+
+function startSnackDrag(id: string, y: number) {
+  stopSnackDrag()
+  snackDrag.value = { id, startY: y, startScroll: window.scrollY, y, scroll: window.scrollY, dropBefore: null }
+  updateDrop()
+  window.addEventListener('touchmove', onSnackDragMove, { passive: false })
+  window.addEventListener('touchend', dropSnack)
+  window.addEventListener('touchcancel', stopSnackDrag)
+  scrollFrame = requestAnimationFrame(autoScroll)
+}
+
+function dropSnack() {
+  const d = snackDrag.value
+  const target = dropIndicator.value
+  stopSnackDrag()
+  if (!d || target === undefined) return
+  const list = blocks.value.filter((b) => b.key !== `snack:${d.id}`)
+  let at = target === null ? list.length : list.findIndex((b) => b.key === target)
+  if (at < 0) at = list.length
+  // Место — последний приём выше точки вставки (нет такого — выше завтрака);
+  // порядок — перекусы этого места до точки, перенесённый, после точки
+  let slot: SnackSlot = 'start'
+  let slotStart = 0
+  list.slice(0, at).forEach((b, i) => {
+    if (b.kind === 'meal') {
+      slot = b.meal
+      slotStart = i + 1
+    }
+  })
+  const snackIds = (part: Block[]) => part.flatMap((b) => (b.kind === 'snack' ? [b.snack.id] : []))
+  const tail = list.slice(at)
+  const firstMeal = tail.findIndex((b) => b.kind === 'meal')
+  const ordered = [
+    ...snackIds(list.slice(slotStart, at)),
+    d.id,
+    ...snackIds(firstMeal === -1 ? tail : tail.slice(0, firstMeal)),
+  ]
+  void moveSnack(d.id, slot, ordered)
+}
+onBeforeUnmount(stopSnackDrag)
 function entriesForSnack(snackId: string) {
   return dayEntries.value.filter((e) => e.snackId === snackId)
 }
@@ -343,16 +485,34 @@ onBeforeRouteLeave((to) => {
 
     </div>
     <div class="flex flex-col gap-3">
-      <template v-for="meal in MEALS" :key="meal">
-        <MealCard :meal="meal" :date="date" :entries="mealEntries[meal]" :day-kcal="dayTotals.kcal" />
-        <SnackCard
-          v-for="snack in snacksByMeal[meal]"
-          :key="snack.id"
-          :snack="snack"
-          :entries="entriesForSnack(snack.id)"
-          :day-kcal="dayTotals.kcal"
-        />
-      </template>
+      <div ref="blocksEl" class="contents">
+        <div v-for="(b, i) in blocks" :key="b.key" :data-block="b.key" class="relative">
+          <!-- Куда встанет перетаскиваемый перекус: полоска в зазоре между
+               карточками (absolute — не двигает раскладку под пальцем) -->
+          <div v-if="dropIndicator === b.key" class="absolute inset-x-3 -top-2 h-1 -translate-y-1/2 rounded-full bg-snack" />
+          <div
+            v-if="dropIndicator === null && i === blocks.length - 1"
+            class="absolute inset-x-3 -bottom-2 h-1 translate-y-1/2 rounded-full bg-snack"
+          />
+          <MealCard v-if="b.kind === 'meal'" :meal="b.meal" :date="date" :entries="mealEntries[b.meal]" :day-kcal="dayTotals.kcal" />
+          <SnackCard
+            v-else
+            :snack="b.snack"
+            :entries="entriesForSnack(b.snack.id)"
+            :day-kcal="dayTotals.kcal"
+            :drag-offset="snackDragOffset(b.snack.id)"
+            @drag-start="(y) => startSnackDrag(b.snack.id, y)"
+          />
+        </div>
+      </div>
+      <button
+        type="button"
+        @click="addSnack"
+        class="rounded-3xl border border-dashed border-snack/50 py-3 text-sm font-medium text-snack flex items-center justify-center gap-1.5"
+      >
+        <Plus :size="16" />
+        Перекус
+      </button>
       <EnergyCard
         :date="date"
         :activities="dayActivities"
