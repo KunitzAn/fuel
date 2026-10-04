@@ -81,14 +81,19 @@ function barColor(v: number): string {
   if (!props.diverging) return props.color ?? 'var(--muted)'
   return v > 0 ? 'var(--activity)' : 'var(--snack)'
 }
-// Число над столбиком (под ним — у дефицита). Узкие столбики (месяц и
-// дольше) у краёв — не по центру, а прижато внутрь, чтобы не вылезало
+// Где число. Неделя (широкие столбики) — прямо над столбиком, у дефицита —
+// под ним. Месяц и дольше — узкие столбики: под ними число наезжало бы на
+// соседние (владелица, 04.10), поэтому — в свободной полосе над графиком,
+// над выбранной колонкой; у краёв прижато внутрь, чтобы не вылезало
 function valueStyle(v: number, i: number) {
   const n = props.bars.length
-  const edge = n > 14 && (i < n * 0.15 || i >= n * 0.85)
+  if (n <= 14) {
+    const y = v < 0 ? { top: `calc(${yPct(v)}% + 2px)` } : { bottom: `calc(${100 - yPct(v)}% + 2px)` }
+    return { cls: 'left-1/2 -translate-x-1/2', style: y }
+  }
+  const edge = i < n * 0.15 || i >= n * 0.85
   const x = !edge ? 'left-1/2 -translate-x-1/2' : i < n / 2 ? 'left-0' : 'right-0'
-  const y = v < 0 ? { top: `calc(${yPct(v)}% + 2px)` } : { bottom: `calc(${100 - yPct(v)}% + 2px)` }
-  return { cls: x, style: y }
+  return { cls: x, style: { top: '-0.875rem' } }
 }
 function showValue(b: ChartBar) {
   return b.value !== null && (props.valuesForAll || b.date === props.selected)
