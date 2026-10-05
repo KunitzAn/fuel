@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ChevronDown, ListChecks, ScanLine } from '@lucide/vue'
+import { ArrowLeft, ChevronDown, ScanLine } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddEntrySheet from '../components/AddEntrySheet.vue'
@@ -11,9 +11,11 @@ import { fetchCatalogByBarcode } from '../lib/barcode'
 import { useCatalogSearch } from '../lib/catalog'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
 import { db, type Entry } from '../lib/db'
-import { addEntry, lastTreatChoice, targetLabel, type MealTarget } from '../lib/diary'
+import { addEntry, lastTreatChoice, softDeleteEntry, targetLabel, type MealTarget } from '../lib/diary'
 import { pickFromCatalog, pickFromEntry, pickFromFood, withBrand, type PickItem } from '../lib/pick'
+import { scaleByGrams } from '../lib/nutrition'
 import { matchesQuery } from '../lib/search'
+import { offerUndo } from '../lib/undo'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 const props = defineProps<{ date: string; meal: 'breakfast' | 'lunch' | 'dinner' | 'snack'; snackId?: string }>()
@@ -149,10 +151,42 @@ const searchBlocks = computed(() => {
 // router.push на конкретный день, а не router.back(): экран может быть
 // открыт без записи в истории браузера (прямая ссылка, перезагрузка) —
 // back() тогда улетает в about:blank, поймала на тесте.
+function backToDiary() {
+  void router.push(`/day/${props.date}`)
+}
+
+// Несколько продуктов за раз (владелица, 05.10): «+» добавляет и оставляет
+// на экране — плашка «Отменить», галочка у строки, поиск чистится под
+// следующий продукт, внизу «Готово · N · ккал». А тап по продукту → окно
+// граммов → «Добавить» — как раньше, сразу в дневник (тоже владелица).
+// Режим «Выбрать» убран: неудобный, а «+» теперь делает то же.
+interface Added {
+  id: string
+  key: string
+  kcal: number
+}
+const added = ref<Added[]>([])
+const addedKeys = computed(() => new Set(added.value.map((a) => a.key)))
+const addedKcal = computed(() => added.value.reduce((sum, a) => sum + a.kcal, 0))
+
 async function quickAdd(item: PickItem) {
   // Без окна граммов — и «Вкусняшка» как в прошлый раз (lastTreatChoice)
-  await addEntry(item, props.date, target.value, item.lastGrams ?? 100, await lastTreatChoice(item))
-  void router.push(`/day/${props.date}`)
+  const grams = item.lastGrams ?? 100
+  const id = await addEntry(item, props.date, target.value, grams, await lastTreatChoice(item))
+  added.value = [...added.value, { id, key: item.key, kcal: scaleByGrams(item, grams).kcal }]
+  query.value = ''
+  offerUndo(`«${item.name}» ${grams} г — добавлено`, async () => {
+    await softDeleteEntry(id)
+    added.value = added.value.filter((a) => a.id !== id)
+  })
+}
+
+function productsWord(n: number) {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return 'продукт'
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'продукта'
+  return 'продуктов'
 }
 
 const opening = ref<PickItem | null>(null)
@@ -193,55 +227,16 @@ async function onBarcodeDetected(code: string) {
 
 function afterAdd() {
   opening.value = null
-  void router.push(`/day/${props.date}`)
-}
-
-// Множественный выбор (обратная связь): отметить сразу несколько строк —
-// с любых вкладок и блоков, в т.ч. из Базы, — у каждой свой вес, добавить
-// всё разом. Выбор общий на экран и не сбрасывается сменой вкладки.
-const selectMode = ref(false)
-const selection = ref(new Map<string, { item: PickItem; grams: number }>())
-const selectedCount = computed(() => selection.value.size)
-
-function toggleSelectMode() {
-  selectMode.value = !selectMode.value
-  if (!selectMode.value) selection.value = new Map()
-}
-function toggleSelect(item: PickItem) {
-  const next = new Map(selection.value)
-  if (next.has(item.key)) next.delete(item.key)
-  else next.set(item.key, { item, grams: item.lastGrams ?? 100 })
-  selection.value = next
-}
-function setSelectionGrams(item: PickItem, grams: number) {
-  const cur = selection.value.get(item.key)
-  if (!cur) return
-  const next = new Map(selection.value)
-  next.set(item.key, { ...cur, grams })
-  selection.value = next
-}
-async function bulkAdd() {
-  for (const { item, grams } of selection.value.values()) {
-    if (grams > 0) await addEntry(item, props.date, target.value, grams, await lastTreatChoice(item))
-  }
-  selection.value = new Map()
-  selectMode.value = false
-  void router.push(`/day/${props.date}`)
+  backToDiary()
 }
 
 function rowBind(item: PickItem) {
-  return {
-    selectable: selectMode.value,
-    selected: selection.value.has(item.key),
-    grams: selection.value.get(item.key)?.grams,
-  }
+  return { added: addedKeys.value.has(item.key) }
 }
 function rowOn(item: PickItem) {
   return {
     open: () => (opening.value = item),
     add: () => void quickAdd(item),
-    toggle: () => toggleSelect(item),
-    'update:grams': (g: number) => setSelectionGrams(item, g),
   }
 }
 // ✎ — своя версия продукта из базы (README «Мои версии продуктов из базы»)
@@ -254,7 +249,7 @@ function titleFor(item: PickItem): string {
   <div class="min-h-dvh bg-bg flex flex-col">
     <header class="px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3 flex flex-col gap-3">
       <div class="flex items-center gap-2">
-        <button type="button" @click="router.push(`/day/${date}`)" class="w-9 h-9 flex items-center justify-center text-ink shrink-0">
+        <button type="button" @click="backToDiary" class="w-9 h-9 flex items-center justify-center text-ink shrink-0">
           <ArrowLeft :size="20" />
         </button>
         <button type="button" @click="pickingTarget = true" class="flex items-center gap-1 text-lg font-semibold text-ink">
@@ -264,10 +259,6 @@ function titleFor(item: PickItem): string {
         <span class="text-sm text-muted">
           {{ date === todayLocalDate() ? 'сегодня' : capitalizeFirst(formatDateWithWeekday(date)) }}
         </span>
-        <button type="button" @click="toggleSelectMode" class="ml-auto flex items-center gap-1 text-sm" :class="selectMode ? 'text-accent' : 'text-muted'">
-          <ListChecks :size="16" />
-          {{ selectMode ? 'Отмена' : 'Выбрать' }}
-        </button>
       </div>
 
       <div class="flex items-center gap-2">
@@ -386,17 +377,17 @@ function titleFor(item: PickItem): string {
       </template>
     </div>
 
+    <!-- Уже добавлено «+» за этот заход — назад в дневник (всё сохранено) -->
     <div
-      v-if="selectMode && selectedCount > 0"
+      v-if="added.length"
       class="sticky bottom-0 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] border-t border-line bg-bg"
     >
       <button
         type="button"
-        aria-label="Добавить выбранное"
-        @click="bulkAdd"
+        @click="backToDiary"
         class="w-full rounded-2xl py-3 text-sm font-medium text-white bg-accent"
       >
-        Добавить ({{ selectedCount }})
+        Готово · {{ added.length }} {{ productsWord(added.length) }} · {{ Math.round(addedKcal) }} ккал
       </button>
     </div>
 

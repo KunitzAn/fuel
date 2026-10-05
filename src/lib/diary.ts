@@ -39,7 +39,8 @@ export function targetLabel(t: MealTarget): string {
  * Снимок КБЖУ берём на этот момент — дальнейшая правка продукта прошлые
  * записи не трогает (README «Правка и удаление»).
  */
-export async function addEntry(item: PickItem, date: string, target: MealTarget, grams: number, treat = false): Promise<void> {
+/** Возвращает id новой записи — для «Отменить» после быстрого «+». */
+export async function addEntry(item: PickItem, date: string, target: MealTarget, grams: number, treat = false): Promise<string> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   await db.entries.add({
@@ -66,6 +67,7 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
   // найдутся по последней записи с этим catalogId.
   if (item.foodId) await rememberLastGrams(item.foodId, grams)
   void runSync()
+  return id
 }
 
 /**
