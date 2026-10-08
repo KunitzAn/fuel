@@ -1,12 +1,15 @@
 export function json(data: unknown, init?: ResponseInit): Response {
-  return new Response(JSON.stringify(data), {
-    ...init,
-    headers: { 'content-type': 'application/json', ...init?.headers },
-  })
+  // Через Headers, а не spread объекта: ответу может понадобиться два
+  // Set-Cookie сразу (выдать сессию и погасить одноразовый challenge passkey),
+  // а в обычном объекте второй ключ затёр бы первый. Как в daylens.
+  const headers = new Headers(init?.headers)
+  headers.set('content-type', 'application/json')
+  return new Response(JSON.stringify(data), { ...init, headers })
 }
 
-export function error(status: number, message: string): Response {
-  return json({ error: message }, { status })
+/** setCookie — чтобы ошибочный ответ мог заодно погасить одноразовую куку. */
+export function error(status: number, message: string, setCookie?: string): Response {
+  return json({ error: message }, { status, ...(setCookie ? { headers: { 'Set-Cookie': setCookie } } : {}) })
 }
 
 /**

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { Fingerprint } from '@lucide/vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '../lib/api'
 import { lastLoginEmail, requestLoginCode, verifyLoginCode } from '../lib/auth'
+import { loginWithPasskey, passkeyAvailable, PasskeyCancelled } from '../lib/passkey'
 import { runSync } from '../lib/sync'
 
 const router = useRouter()
@@ -14,6 +16,39 @@ const code = ref('')
 const step = ref<'email' | 'code'>('email')
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
+
+// Куда после входа — туда, куда шли (router.ts кладёт `redirect`), иначе дневник
+function afterLogin() {
+  void runSync()
+  const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/'
+  void router.replace(redirect)
+}
+
+// Face ID (как в daylens): кнопку показываем, только если на устройстве есть
+// встроенный аутентификатор — предлагать то, чего нет, незачем
+const canUsePasskey = ref(false)
+const passkeyLoading = ref(false)
+onMounted(async () => {
+  canUsePasskey.value = await passkeyAvailable()
+})
+
+async function signInWithPasskey() {
+  passkeyLoading.value = true
+  errorMessage.value = null
+  try {
+    await loginWithPasskey()
+    afterLogin()
+  } catch (err) {
+    // Передумала прикладывать лицо — молча как было, это не ошибка
+    if (err instanceof PasskeyCancelled) return
+    errorMessage.value =
+      err instanceof ApiError && err.status === 400
+        ? 'Этот ключ не подошёл. Войдите по коду с почты — и ключ можно будет завести заново в Настройках.'
+        : 'Не получилось войти по Face ID. Попробуйте код с почты.'
+  } finally {
+    passkeyLoading.value = false
+  }
+}
 
 async function submitEmail() {
   if (!email.value.trim()) return
@@ -35,10 +70,7 @@ async function submitCode() {
   errorMessage.value = null
   try {
     await verifyLoginCode(email.value.trim(), code.value.trim())
-    void runSync()
-    // Сразу в дневник (владелица) — или туда, куда шли до входа
-    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/'
-    void router.replace(redirect)
+    afterLogin() // сразу в дневник (владелица) — или туда, куда шли до входа
   } catch (err) {
     errorMessage.value =
       err instanceof ApiError && err.status === 400
@@ -66,6 +98,24 @@ function resend() {
       </header>
 
       <template v-if="step === 'email'">
+        <!-- Первым, до формы: если ключ заведён, вводить не нужно ничего -->
+        <template v-if="canUsePasskey">
+          <button
+            type="button"
+            :disabled="passkeyLoading"
+            @click="signInWithPasskey"
+            class="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 glass text-ink font-medium disabled:opacity-40"
+          >
+            <Fingerprint :size="18" class="text-accent" />
+            {{ passkeyLoading ? 'Проверяю…' : 'Войти по Face ID' }}
+          </button>
+          <div class="flex items-center gap-3">
+            <span class="h-px flex-1 bg-line" />
+            <span class="text-xs text-muted">или по коду с почты</span>
+            <span class="h-px flex-1 bg-line" />
+          </div>
+        </template>
+
         <p class="text-sm text-muted">
           Вход без пароля: пришлём код на почту, введёте его здесь.
         </p>

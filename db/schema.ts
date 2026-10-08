@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { bigint, boolean, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -27,6 +27,41 @@ export const loginCodes = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('login_codes_hash_uidx').on(t.codeHash)],
+)
+
+/**
+ * Passkey (WebAuthn). Второй способ входа рядом с кодом на почту, не вместо:
+ * ключ живёт в связке ключей iCloud, то есть переживает удаление приложения и
+ * очистку данных Safari — ровно то, чего не умеет ни одно веб-хранилище.
+ *
+ * Приватного ключа тут нет и быть не может — он не покидает устройство. Мы
+ * храним публичный, им только проверяется подпись; утечка этой таблицы не даёт
+ * войти ни за кого.
+ */
+export const passkeys = pgTable(
+  'passkeys',
+  {
+    /** credential ID от аутентификатора, base64url. */
+    id: text('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    publicKey: text('public_key').notNull(),
+    /**
+     * Счётчик подписей — защита от клонированного аутентификатора. bigint, а не
+     * integer: по спеке это uint32, а он не влезает в знаковый int4. Платформенные
+     * passkey (Face ID) всегда шлют 0, но закладываться на это нельзя — ключ могут
+     * завести и с внешнего USB-токена.
+     */
+    counter: bigint('counter', { mode: 'number' }).notNull().default(0),
+    /** JSON-массив: по нему браузер подсказывает, где искать ключ (internal, hybrid…). */
+    transports: text('transports'),
+    /** Для списка в настройках — иначе непонятно, какой ключ удаляешь. */
+    label: text('label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => [index('passkeys_user_idx').on(t.userId)],
 )
 
 /** Только для rate-limit проверки в API — не читается фронтендом. */
