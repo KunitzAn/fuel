@@ -332,6 +332,10 @@ export const entries = pgTable(
     // «Лакомство» (владелица, после этапа 6): отметка на конкретной записи —
     // считать отдельно, сколько КБЖУ уходит на основную еду, а сколько нет
     treat: boolean('treat').notNull().default(false),
+    // Убрана из Истории на экране добавления (владелица, 13.10: смахнуть
+    // строку истории). Сама запись и продукт остаются; новая запись того же
+    // продукта снова покажет его в истории
+    historyHidden: boolean('history_hidden').notNull().default(false),
     ...syncColumns,
   },
   (t) => [index('entries_user_sync_idx').on(t.userId, t.serverUpdatedAt)],

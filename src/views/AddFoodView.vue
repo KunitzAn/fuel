@@ -7,11 +7,12 @@ import BarcodeScannerSheet from '../components/BarcodeScannerSheet.vue'
 import FoodFormSheet from '../components/FoodFormSheet.vue'
 import FoodListRow from '../components/FoodListRow.vue'
 import MealTargetSheet from '../components/MealTargetSheet.vue'
+import SwipeRow from '../components/SwipeRow.vue'
 import { fetchCatalogByBarcode } from '../lib/barcode'
 import { useCatalogSearch } from '../lib/catalog'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/date'
 import { db, type Entry } from '../lib/db'
-import { addEntry, lastTreatChoice, softDeleteEntry, targetLabel, type MealTarget } from '../lib/diary'
+import { addEntry, lastTreatChoice, setHistoryHidden, softDeleteEntry, targetLabel, type MealTarget } from '../lib/diary'
 import { pickFromCatalog, pickFromEntry, pickFromFood, withBrand, type PickItem } from '../lib/pick'
 import { scaleByGrams } from '../lib/nutrition'
 import { matchesQuery } from '../lib/search'
@@ -81,7 +82,9 @@ function buildHistory(filter: HistoryFilter) {
     if (!key || !matchesQuery(query.value, withBrand(e.name, e.brand))) continue
     const prev = latest.get(key)
     if (!prev || e.createdAt > prev.createdAt) latest.set(key, e)
-    if (filter !== 'all' && e.meal !== filter) continue
+    // Убранные из Истории (смахнули строку) в неё не попадают, но граммы
+    // «с прошлого раза» выше берутся и с них
+    if (e.historyHidden || (filter !== 'all' && e.meal !== filter)) continue
     const prevUsed = usedAt.get(key)
     if (!prevUsed || e.createdAt > prevUsed) usedAt.set(key, e.createdAt)
   }
@@ -99,6 +102,26 @@ function buildHistory(filter: HistoryFilter) {
     .filter((r): r is { entry: Entry; item: PickItem } => r.item !== null && !seen.has(r.item.key) && (seen.add(r.item.key), true))
 }
 const historyRows = computed(() => buildHistory(historyFilter.value))
+
+// Смахнуть строку Истории влево — убрать продукт из истории (владелица,
+// 13.10). Продукт не удаляется: он остаётся в Продуктах/Базе и находится
+// поиском, а добавишь снова — вернётся в историю. Во «Все» (и в поиске)
+// убирается из истории целиком, в фильтре приёма — только из этого приёма.
+// Запись могла попасть в строку и через «мою версию» продукта из базы,
+// поэтому ищем записи по тому же правилу, каким строится строка.
+function hideFromHistory(item: PickItem, filter: HistoryFilter) {
+  const ids = allEntries.value
+    .filter((e) => {
+      if (e.historyHidden || (filter !== 'all' && e.meal !== filter)) return false
+      const version = !e.foodId && e.catalogId ? myVersionByCatalog.value.get(e.catalogId) : undefined
+      const key = version ? pickFromFood(version).key : pickFromEntry(e, foodsById.value)?.key
+      return key === item.key
+    })
+    .map((e) => e.id)
+  if (!ids.length) return
+  void setHistoryHidden(ids, true)
+  offerUndo(`«${item.name}» убрано из истории`, () => setHistoryHidden(ids, false))
+}
 // В поиске вкладок (и переключателя) не видно — ищем по всей Истории,
 // иначе продукт «пропадал» бы из-за фильтра, которого не видно.
 const searchHistoryRows = computed(() => buildHistory('all'))
@@ -288,14 +311,15 @@ function titleFor(item: PickItem): string {
         <template v-if="searchBlocks.history.length">
           <h3 class="text-xs text-muted mb-1.5 px-1">История</h3>
           <div class="rounded-2xl glass overflow-hidden mb-4">
-            <FoodListRow
+            <SwipeRow
               v-for="row in searchBlocks.history"
               :key="row.item.key"
-              :title="titleFor(row.item)"
-              :trailing="`${row.entry.grams} г`"
-              v-bind="rowBind(row.item)"
-              v-on="rowOn(row.item)"
-            />
+              label="Убрать"
+              class="border-t border-line first:border-t-0"
+              @remove="hideFromHistory(row.item, 'all')"
+            >
+              <FoodListRow :title="titleFor(row.item)" :trailing="`${row.entry.grams} г`" v-bind="rowBind(row.item)" v-on="rowOn(row.item)" />
+            </SwipeRow>
           </div>
         </template>
         <template v-if="searchBlocks.products.length">
@@ -342,14 +366,16 @@ function titleFor(item: PickItem): string {
         </div>
         <div class="rounded-2xl glass overflow-hidden">
           <p v-if="historyRows.length === 0" class="px-4 py-3 text-sm text-muted">Пока пусто</p>
-          <FoodListRow
+          <!-- Свайп влево — убрать из истории (не из Продуктов) -->
+          <SwipeRow
             v-for="row in historyRows"
             :key="row.item.key"
-            :title="titleFor(row.item)"
-            :trailing="`${row.entry.grams} г`"
-            v-bind="rowBind(row.item)"
-            v-on="rowOn(row.item)"
-          />
+            label="Убрать"
+            class="border-t border-line first:border-t-0"
+            @remove="hideFromHistory(row.item, historyFilter)"
+          >
+            <FoodListRow :title="titleFor(row.item)" :trailing="`${row.entry.grams} г`" v-bind="rowBind(row.item)" v-on="rowOn(row.item)" />
+          </SwipeRow>
         </div>
       </template>
 

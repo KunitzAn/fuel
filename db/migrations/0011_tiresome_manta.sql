@@ -1,0 +1,1 @@
+ALTER TABLE "entries" ADD COLUMN "history_hidden" boolean DEFAULT false NOT NULL;

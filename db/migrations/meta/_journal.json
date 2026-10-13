@@ -78,6 +78,13 @@
       "when": 1791477904085,
       "tag": "0010_brainy_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791915716067,
+      "tag": "0011_tiresome_manta",
+      "breakpoints": true
     }
   ]
 }

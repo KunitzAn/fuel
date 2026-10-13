@@ -47,6 +47,8 @@ export interface Entry {
   grams: number
   /** «Лакомство» — не основная еда; у старых локальных строк может не быть. */
   treat?: boolean
+  /** Убрана из Истории (смахнули строку); у старых локальных строк может не быть. */
+  historyHidden?: boolean
   createdAt: string // порядок в дне и в «Истории»
   updatedAt: string
   deletedAt: string | null

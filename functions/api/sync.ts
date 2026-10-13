@@ -107,6 +107,7 @@ interface WireEntry {
   kcal: number
   grams: number
   treat?: boolean // нет у старых клиентов — false
+  historyHidden?: boolean // то же
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -252,6 +253,7 @@ function wireEntry(e: typeof entries.$inferSelect) {
     kcal: e.kcal,
     grams: e.grams,
     treat: e.treat,
+    historyHidden: e.historyHidden,
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),
     deletedAt: e.deletedAt?.toISOString() ?? null,
@@ -559,6 +561,7 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
         kcal: e.kcal,
         grams: e.grams,
         treat: e.treat ?? false,
+        historyHidden: e.historyHidden ?? false,
         createdAt: new Date(e.createdAt),
         updatedAt: new Date(e.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -581,6 +584,7 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
         kcal: sql`excluded.kcal`,
         grams: sql`excluded.grams`,
         treat: sql`excluded.treat`,
+        historyHidden: sql`excluded.history_hidden`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,

@@ -99,6 +99,16 @@ export async function softDeleteEntry(id: string): Promise<void> {
   void runSync()
 }
 
+/**
+ * Убрать записи из Истории экрана добавления (или вернуть — «Отменить»).
+ * Из дневника они не пропадают, продукт тоже остаётся.
+ */
+export async function setHistoryHidden(ids: string[], hidden: boolean): Promise<void> {
+  const now = new Date().toISOString()
+  await db.entries.where('id').anyOf(ids).modify({ historyHidden: hidden, updatedAt: now, dirty: true })
+  void runSync()
+}
+
 /** «Отменить» после удаления (lib/undo.ts) — запись возвращается как была. */
 export async function restoreEntry(id: string): Promise<void> {
   const now = new Date().toISOString()
