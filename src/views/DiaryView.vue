@@ -355,8 +355,7 @@ onBeforeRouteLeave((to) => {
 </script>
 
 <template>
-  <!-- Под статус-баром iPhone прилипшие плашки не должны просвечивать -->
-  <div class="fixed top-0 inset-x-0 z-30 h-[env(safe-area-inset-top)] bg-bg/70 backdrop-blur-xl" />
+  <!-- Полоса под часами iPhone — общая, в index.html (#status-strip) -->
   <main
     class="mx-auto max-w-md px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-24 flex flex-col gap-4"
     :style="{ '--day-header-h': `${dayHeaderHeight}px` }"

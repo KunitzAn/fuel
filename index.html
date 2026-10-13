@@ -15,7 +15,11 @@
     <!-- PWA / iOS «На экран Домой» -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- black-translucent: полосу под часами iPhone рисует само приложение
+         (#status-strip ниже). С `default` её рисовала система и выбирала цвет
+         один раз при запуске: телефон вечером переходил в тёмную тему,
+         приложение темнело, а полоса оставалась белой (владелица, 13.10) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Fuel" />
 
     <!-- Сплэш-скрины при холодном запуске PWA на iOS, светлые и тёмные.
@@ -50,6 +54,22 @@
       @media (prefers-color-scheme: dark) {
         html, body { background: #0f0e13; }
       }
+      /* Полоса под часами iPhone. Часы в этом режиме всегда белые, поэтому
+         в светлой теме под ними цвет приложения (лаванда → розовый), в
+         тёмной — фон. В браузере и на компьютере высота 0 — полосы нет. */
+      #status-strip {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: env(safe-area-inset-top);
+        z-index: 60;
+        pointer-events: none;
+        background: linear-gradient(90deg, #8f6bff, #ff3d8b);
+      }
+      @media (prefers-color-scheme: dark) {
+        #status-strip { background: #0f0e13; }
+      }
       #app-loading {
         position: fixed;
         inset: 0;
@@ -72,6 +92,7 @@
     <title>Fuel</title>
   </head>
   <body>
+    <div id="status-strip"></div>
     <div id="app">
       <!-- Показывается, пока грузится и монтируется Vue-приложение;
            mount('#app') заменит это содержимое. -->
