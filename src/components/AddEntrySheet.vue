@@ -6,9 +6,12 @@ import { ChevronDown, Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { db } from '../lib/db'
 import { addEntry, lastTreatChoice, targetLabel, type MealTarget } from '../lib/diary'
-import { parseDecimal, scaleByGrams } from '../lib/nutrition'
+import { useAmount } from '../lib/amount'
+import { createFood, setPieceGrams } from '../lib/foods'
+import { scaleByGrams } from '../lib/nutrition'
 import { pickFromFood, type PickItem } from '../lib/pick'
 import { TREAT_LABEL, TreatIcon } from '../lib/treat'
+import AmountField from './AmountField.vue'
 import FoodFormSheet from './FoodFormSheet.vue'
 import MealTargetSheet from './MealTargetSheet.vue'
 
@@ -22,14 +25,44 @@ const emit = defineEmits<{ close: []; added: [] }>()
 // с уже верными данными).
 const editingFood = ref(false)
 
-// Граммы с прошлого раза для этого продукта — впервые 100 г (README).
-// Тап по полю очищает его — как в окне правки записи (владелица); граммы с
-// прошлого раза остаются подсказкой и значением, пока ничего не вписано
-const defaultGrams = props.item.lastGrams ?? 100
-const gramsInput = ref(String(defaultGrams))
-const grams = computed(() => parseDecimal(gramsInput.value) ?? defaultGrams)
-function clearOnFocus() {
-  if (gramsInput.value === String(defaultGrams)) gramsInput.value = ''
+// Сколько — граммами или штуками (lib/amount.ts), как в прошлый раз для
+// этого продукта; впервые — 100 г (README)
+const amount = useAmount({
+  grams: props.item.lastGrams ?? 100,
+  pieces: props.item.lastPieces,
+  pieceGrams: props.item.pieceGrams,
+})
+const grams = computed(() => amount.grams)
+
+// Вес штуки вписали здесь — запоминаем у продукта. Свой — пишем в него;
+// из базы — заводим «мою версию» с этим весом (владелица, 22.10, вариант А:
+// дальше он в «Продуктах» и в поиске вместо оригинала, штуки помнит).
+// Снимок удалённого продукта — вес только для этой записи.
+async function withPieceGrams(item: PickItem): Promise<PickItem> {
+  const g = amount.newPieceGrams
+  if (g === null) return item
+  if (item.food) {
+    await setPieceGrams(item.food.id, g)
+    return item
+  }
+  if (!item.catalogId) return item
+  const id = await createFood(
+    {
+      kind: 'product',
+      name: item.name,
+      brand: null,
+      barcode: item.barcode,
+      protein: item.protein,
+      fat: item.fat,
+      carbs: item.carbs,
+      kcal: item.kcal,
+      note: null,
+      pieceGrams: g,
+    },
+    item.catalogId,
+  )
+  const food = await db.foods.get(id)
+  return food ? pickFromFood(food) : item
 }
 const target = ref<MealTarget>(props.target)
 
@@ -59,7 +92,8 @@ function pickTarget(t: MealTarget) {
 
 async function add() {
   if (grams.value <= 0) return
-  await addEntry(props.item, props.date, target.value, grams.value, treat.value)
+  const item = await withPieceGrams(props.item)
+  await addEntry(item, props.date, target.value, grams.value, treat.value, amount.entryPieces)
   emit('added')
 }
 
@@ -70,8 +104,11 @@ async function add() {
 async function onFoodSaved(id: string, addNow: boolean) {
   editingFood.value = false
   const food = addNow ? await db.foods.get(id) : undefined
-  if (food && grams.value > 0) {
-    await addEntry(pickFromFood(food), props.date, target.value, grams.value, treat.value)
+  // Штуками — по весу штуки из только что сохранённой формы (его могли поменять там)
+  const pieceGrams = amount.unit === 'pcs' ? (food?.pieceGrams ?? amount.pieceGrams) : null
+  const addGrams = pieceGrams ? Math.round(amount.pieces * pieceGrams * 10) / 10 : grams.value
+  if (food && addGrams > 0) {
+    await addEntry(pickFromFood(food), props.date, target.value, addGrams, treat.value, pieceGrams ? amount.pieces : null)
     emit('added')
   } else {
     emit('close')
@@ -109,18 +146,7 @@ function onFoodDeleted() {
         </button>
       </div>
 
-      <div class="flex items-center gap-2 rounded-2xl glass px-4 py-3">
-        <input
-          v-model="gramsInput"
-          type="text"
-          inputmode="decimal"
-          autofocus
-          :placeholder="String(defaultGrams)"
-          @focus="clearOnFocus"
-          class="flex-1 text-2xl font-semibold text-ink bg-transparent outline-none"
-        />
-        <span class="text-sm text-muted">г</span>
-      </div>
+      <AmountField :amount="amount" />
 
       <p class="text-sm text-muted">
         Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} · Б {{ scaled.protein.toFixed(1) }} ·

@@ -13,6 +13,10 @@ export interface Food {
   note: string | null // рецепт-заметка блюда, в расчётах не участвует
   sourceCatalogId: string | null // если это «моя версия» продукта из базы
   lastGrams: number | null // подстановка в окно граммов
+  /** Вес 1 шт, г — можно добавлять штуками; у старых строк может не быть. */
+  pieceGrams?: number | null
+  /** Сколько штук в прошлый раз, если добавляли штуками. */
+  lastPieces?: number | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -49,6 +53,8 @@ export interface Entry {
   treat?: boolean
   /** Убрана из Истории (смахнули строку); у старых локальных строк может не быть. */
   historyHidden?: boolean
+  /** Добавлено штуками — сколько; граммы уже в `grams`. Пусто — граммами. */
+  pieces?: number | null
   createdAt: string // порядок в дне и в «Истории»
   updatedAt: string
   deletedAt: string | null

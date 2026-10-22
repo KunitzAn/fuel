@@ -42,6 +42,12 @@ if (props.food) void countFoodEntries(props.food.id).then((n) => (entriesCount.v
 const barcode = ref(src?.barcode ?? props.presetBarcode ?? '')
 const scanningBarcode = ref(false)
 const note = ref(props.food?.note ?? '')
+// Вес 1 шт — необязательно; есть — продукт можно добавлять штуками
+const pieceGramsInput = ref(src?.pieceGrams ? String(src.pieceGrams) : '')
+const pieceGrams = computed(() => {
+  const v = parseDecimal(pieceGramsInput.value)
+  return v !== null && v > 0 ? v : null
+})
 // Хранится всегда на 100 г — при правке нет смысла угадывать, вводили ли
 // когда-то «на порцию», просто показываем уже пересчитанное.
 const servingMode = ref<'per100' | 'perServing'>('per100')
@@ -97,6 +103,7 @@ async function save(addNow: boolean) {
     carbs: per100.value.carbs,
     kcal,
     note: props.kind === 'dish' && note.value.trim() ? note.value.trim() : null,
+    pieceGrams: pieceGrams.value,
   }
   let id: string
   if (props.food && saveAsCopy.value) {
@@ -218,6 +225,19 @@ function onBarcodeScanned(code: string) {
         </button>
       </div>
       <p v-if="kcalMismatch !== null" class="text-xs text-muted -mt-2">По БЖУ выходит {{ kcalMismatch }} — не ошибка, просто на всякий случай</p>
+
+      <!-- Штуки (владелица, 22.10): вес одной штуки — и в окне граммов
+           появится «шт». Можно вписать и потом, прямо в окне граммов -->
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-muted">Вес 1 шт, г — чтобы добавлять штуками (необязательно)</span>
+        <input
+          v-model="pieceGramsInput"
+          type="text"
+          inputmode="decimal"
+          :placeholder="kind === 'product' ? 'например, 300' : 'например, 60'"
+          class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+        />
+      </label>
 
       <label v-if="kind === 'dish'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Заметка (из чего и в каких пропорциях — в расчётах не участвует)</span>

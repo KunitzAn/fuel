@@ -15,7 +15,7 @@ const SYNC_SCHEMA_KEY = 'syncSchema'
  * Смена номера = один полный pull с заменой всех строк, которые локально
  * не правились (`dirty: false`).
  */
-const SYNC_SCHEMA = 5 // 5 — entries.historyHidden
+const SYNC_SCHEMA = 6 // 5 — entries.historyHidden; 6 — штуки (pieceGrams, lastPieces, pieces)
 // Сервер апсертит одним запросом на таблицу — в лимит Cloudflare по
 // сабзапросам (см. functions/api/sync.ts) больше не упираемся. Резать на
 // части всё равно стоит: одна VALUES-пачка в тысячи строк (многодневный

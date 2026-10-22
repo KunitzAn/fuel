@@ -34,6 +34,10 @@ export interface PickItem {
   kcal: number
   /** Подстановка в окно граммов; впервые — 100 г (README). */
   lastGrams: number | null
+  /** Вес 1 шт, г — можно добавлять штуками (lib/amount.ts); null — не задан. */
+  pieceGrams: number | null
+  /** Прошлый раз добавляли штуками — сколько; null — граммами. */
+  lastPieces: number | null
   /** Свой продукт — его можно править (карандаш в окне граммов). */
   food: Food | null
 }
@@ -65,6 +69,8 @@ export function pickFromFood(food: Food): PickItem {
     carbs: food.carbs,
     kcal: food.kcal,
     lastGrams: food.lastGrams,
+    pieceGrams: food.pieceGrams ?? null,
+    lastPieces: food.lastPieces ?? null,
     food,
   }
 }
@@ -82,6 +88,10 @@ export function pickFromCatalog(item: CatalogItem, lastGrams: number | null): Pi
     carbs: item.carbs,
     kcal: item.kcal,
     lastGrams,
+    // Вес штуки у продукта из базы хранить негде — впишут в окне граммов,
+    // и появится «моя версия» с ним (владелица выбрала так, 22.10)
+    pieceGrams: null,
+    lastPieces: null,
     food: null,
   }
 }
@@ -106,6 +116,9 @@ export function pickFromEntry(entry: Entry, foodsById: Map<string, Food>): PickI
     carbs: entry.carbs,
     kcal: entry.kcal,
     lastGrams: entry.grams,
+    // Снимок: вес штуки — тот, что был у этой записи
+    pieceGrams: entry.pieces ? entry.grams / entry.pieces : null,
+    lastPieces: entry.pieces ?? null,
     food: null,
   }
 }

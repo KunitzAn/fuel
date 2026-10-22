@@ -14,6 +14,7 @@ import { capitalizeFirst, formatDateWithWeekday, todayLocalDate } from '../lib/d
 import { db, type Entry } from '../lib/db'
 import { addEntry, lastTreatChoice, setHistoryHidden, softDeleteEntry, targetLabel, type MealTarget } from '../lib/diary'
 import { pickFromCatalog, pickFromEntry, pickFromFood, withBrand, type PickItem } from '../lib/pick'
+import { formatPieces } from '../lib/amount'
 import { scaleByGrams } from '../lib/nutrition'
 import { matchesQuery } from '../lib/search'
 import { offerUndo } from '../lib/undo'
@@ -194,11 +195,13 @@ const addedKcal = computed(() => added.value.reduce((sum, a) => sum + a.kcal, 0)
 
 async function quickAdd(item: PickItem) {
   // Без окна граммов — и «Вкусняшка» как в прошлый раз (lastTreatChoice)
-  const grams = item.lastGrams ?? 100
-  const id = await addEntry(item, props.date, target.value, grams, await lastTreatChoice(item))
+  // Прошлый раз брали штуками — снова столько же штук (граммы — по текущему весу штуки)
+  const pieces = item.lastPieces && item.pieceGrams ? item.lastPieces : null
+  const grams = pieces ? Math.round(pieces * item.pieceGrams! * 10) / 10 : (item.lastGrams ?? 100)
+  const id = await addEntry(item, props.date, target.value, grams, await lastTreatChoice(item), pieces)
   added.value = [...added.value, { id, key: item.key, kcal: scaleByGrams(item, grams).kcal }]
   query.value = ''
-  offerUndo(`«${item.name}» ${grams} г — добавлено`, async () => {
+  offerUndo(`«${item.name}» ${pieces ? `${formatPieces(pieces)} шт` : `${grams} г`} — добавлено`, async () => {
     await softDeleteEntry(id)
     added.value = added.value.filter((a) => a.id !== id)
   })
@@ -262,6 +265,10 @@ function rowOn(item: PickItem) {
     add: () => void quickAdd(item),
   }
 }
+// В истории — как добавляли в прошлый раз: «1 шт» или «300 г»
+function historyAmount(e: Entry) {
+  return e.pieces ? `${formatPieces(e.pieces)} шт` : `${e.grams} г`
+}
 // ✎ — своя версия продукта из базы (README «Мои версии продуктов из базы»)
 function titleFor(item: PickItem): string {
   return item.food?.sourceCatalogId ? `${item.name} ✎` : item.name
@@ -318,7 +325,7 @@ function titleFor(item: PickItem): string {
               class="border-t border-line first:border-t-0"
               @remove="hideFromHistory(row.item, 'all')"
             >
-              <FoodListRow :title="titleFor(row.item)" :trailing="`${row.entry.grams} г`" v-bind="rowBind(row.item)" v-on="rowOn(row.item)" />
+              <FoodListRow :title="titleFor(row.item)" :trailing="historyAmount(row.entry)" v-bind="rowBind(row.item)" v-on="rowOn(row.item)" />
             </SwipeRow>
           </div>
         </template>
@@ -374,7 +381,7 @@ function titleFor(item: PickItem): string {
             class="border-t border-line first:border-t-0"
             @remove="hideFromHistory(row.item, historyFilter)"
           >
-            <FoodListRow :title="titleFor(row.item)" :trailing="`${row.entry.grams} г`" v-bind="rowBind(row.item)" v-on="rowOn(row.item)" />
+            <FoodListRow :title="titleFor(row.item)" :trailing="historyAmount(row.entry)" v-bind="rowBind(row.item)" v-on="rowOn(row.item)" />
           </SwipeRow>
         </div>
       </template>

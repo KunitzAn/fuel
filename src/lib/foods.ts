@@ -13,6 +13,8 @@ export interface FoodDraft {
   carbs: number
   kcal: number
   note: string | null
+  /** Вес 1 шт, г — тогда можно добавлять штуками; null — только граммами. */
+  pieceGrams: number | null
 }
 
 /** sourceCatalogId — «моя версия» продукта из базы (этап 2.6), иначе null. */
@@ -24,6 +26,7 @@ export async function createFood(draft: FoodDraft, sourceCatalogId: string | nul
     ...draft,
     sourceCatalogId,
     lastGrams: null,
+    lastPieces: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -76,11 +79,23 @@ export async function softDeleteFood(id: string): Promise<void> {
   void runSync()
 }
 
-/** Граммы с прошлого раза — подстановка в окно ввода при следующем добавлении. */
-export async function rememberLastGrams(foodId: string, grams: number): Promise<void> {
+/**
+ * Граммы (и штуки, если добавляли штуками) с прошлого раза — подстановка в
+ * окно ввода при следующем добавлении.
+ */
+export async function rememberLastGrams(foodId: string, grams: number, pieces: number | null = null): Promise<void> {
   // updatedAt тоже двигаем: без него правка уходила со старым временем и
   // сервер (LWW) мог её отклонить, если его версия новее
-  await db.foods.update(foodId, { lastGrams: grams, updatedAt: new Date().toISOString(), dirty: true })
+  await db.foods.update(foodId, { lastGrams: grams, lastPieces: pieces, updatedAt: new Date().toISOString(), dirty: true })
+  void runSync()
+}
+
+/**
+ * Вес 1 шт вписали прямо в окне граммов (а не в форме продукта). Записи в
+ * дневнике не трогаем — граммы в них уже посчитаны.
+ */
+export async function setPieceGrams(foodId: string, pieceGrams: number): Promise<void> {
+  await db.foods.update(foodId, { pieceGrams, updatedAt: new Date().toISOString(), dirty: true })
   void runSync()
 }
 

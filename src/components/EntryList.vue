@@ -7,6 +7,7 @@ import type { Entry } from '../lib/db'
 import { restoreEntry, softDeleteEntry } from '../lib/diary'
 import { scaleByGrams } from '../lib/nutrition'
 import { withBrand } from '../lib/pick'
+import { formatPieces } from '../lib/amount'
 import { TreatIcon } from '../lib/treat'
 import { offerUndo } from '../lib/undo'
 import GramsEditSheet from './GramsEditSheet.vue'
@@ -49,7 +50,10 @@ function remove(entry: Entry) {
             <TreatIcon v-if="entry.treat" :size="15" class="text-treat" aria-label="Вкусняшка" />
           </span>
         </div>
-        <p class="mt-0.5 text-xs text-(--card-color)">{{ entry.grams }} г</p>
+        <!-- Штуками — «1 шт · 300 г», граммами — просто граммы -->
+        <p class="mt-0.5 text-xs text-(--card-color)">
+          <template v-if="entry.pieces">{{ formatPieces(entry.pieces) }} шт · </template>{{ entry.grams }} г
+        </p>
         <!-- Те же столбцы, что в шапке приёма: сетка на 4 и справа место под
              шеврон (w-4 + gap-3), чтобы цифры стояли под цифрами -->
         <div class="flex gap-3 mt-1">

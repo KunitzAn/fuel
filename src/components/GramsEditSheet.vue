@@ -4,12 +4,15 @@
 // у него будет и подстановка «граммы с прошлого раза», и выбор приёма.
 import { Pencil } from '@lucide/vue'
 import { computed, ref } from 'vue'
+import AmountField from './AmountField.vue'
 import FoodFormSheet from './FoodFormSheet.vue'
 import { withBrand } from '../lib/pick'
 import { TREAT_LABEL, TreatIcon } from '../lib/treat'
 import { db, type Entry, type Food } from '../lib/db'
 import { softDeleteEntry, updateEntryGrams } from '../lib/diary'
-import { parseDecimal, scaleByGrams } from '../lib/nutrition'
+import { useAmount } from '../lib/amount'
+import { setPieceGrams } from '../lib/foods'
+import { scaleByGrams } from '../lib/nutrition'
 import { pickFromEntry, type PickItem } from '../lib/pick'
 
 const props = defineProps<{ entry: Entry }>()
@@ -37,13 +40,21 @@ function closeAll() {
   emit('close')
 }
 
-// Тап по полю очищает его (владелица: не стирать 42 руками перед вводом
-// нового числа); прежние граммы остаются подсказкой, и пока поле пустое —
-// считаем по ним же, «Сохранить» без ввода ничего не меняет.
-const gramsInput = ref(String(props.entry.grams))
-const grams = computed(() => parseDecimal(gramsInput.value) ?? props.entry.grams)
-function clearOnFocus() {
-  if (gramsInput.value === String(props.entry.grams)) gramsInput.value = ''
+// Граммами или штуками (lib/amount.ts) — как была добавлена запись. Тап
+// по полю очищает его (владелица: не стирать 42 руками перед вводом нового
+// числа); прежнее значение — подсказкой, «Сохранить» без ввода ничего не
+// меняет. Вес штуки — тот, что был у этой записи; добавлена граммами —
+// подставим вес штуки из продукта, если он есть.
+const amount = useAmount({
+  grams: props.entry.grams,
+  pieces: props.entry.pieces ?? null,
+  pieceGrams: props.entry.pieces ? props.entry.grams / props.entry.pieces : null,
+})
+const grams = computed(() => amount.grams)
+if (!props.entry.pieces && props.entry.foodId) {
+  void db.foods.get(props.entry.foodId).then((f) => {
+    if (f?.pieceGrams) amount.knowPieceGrams(f.pieceGrams)
+  })
 }
 
 const per100 = computed(() => ({
@@ -59,7 +70,13 @@ const treat = ref(props.entry.treat === true)
 
 async function save() {
   if (grams.value <= 0) return
-  await updateEntryGrams(props.entry.id, grams.value, treat.value)
+  // Вписали/поменяли вес штуки — запоминаем у своего продукта (у продукта
+  // из базы — только для этой записи)
+  if (amount.newPieceGrams !== null && props.entry.foodId) {
+    const food = await db.foods.get(props.entry.foodId)
+    if (food && !food.deletedAt) await setPieceGrams(food.id, amount.newPieceGrams)
+  }
+  await updateEntryGrams(props.entry.id, grams.value, treat.value, amount.entryPieces)
   emit('close')
 }
 
@@ -95,18 +112,7 @@ async function remove() {
         </button>
       </div>
 
-      <div class="flex items-center gap-2 rounded-2xl glass px-4 py-3">
-        <input
-          v-model="gramsInput"
-          type="text"
-          inputmode="decimal"
-          autofocus
-          :placeholder="String(entry.grams)"
-          @focus="clearOnFocus"
-          class="flex-1 text-2xl font-semibold text-ink bg-transparent outline-none"
-        />
-        <span class="text-sm text-muted">г</span>
-      </div>
+      <AmountField :amount="amount" />
 
       <p class="text-sm text-muted">
         Ж {{ scaled.fat.toFixed(1) }} · У {{ scaled.carbs.toFixed(1) }} · Б {{ scaled.protein.toFixed(1) }} ·

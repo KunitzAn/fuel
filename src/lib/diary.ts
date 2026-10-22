@@ -40,7 +40,14 @@ export function targetLabel(t: MealTarget): string {
  * записи не трогает (README «Правка и удаление»).
  */
 /** Возвращает id новой записи — для «Отменить» после быстрого «+». */
-export async function addEntry(item: PickItem, date: string, target: MealTarget, grams: number, treat = false): Promise<string> {
+export async function addEntry(
+  item: PickItem,
+  date: string,
+  target: MealTarget,
+  grams: number,
+  treat = false,
+  pieces: number | null = null, // добавлено штуками — сколько (граммы уже пересчитаны)
+): Promise<string> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   await db.entries.add({
@@ -58,6 +65,7 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
     kcal: item.kcal,
     grams,
     treat,
+    pieces,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -65,7 +73,7 @@ export async function addEntry(item: PickItem, date: string, target: MealTarget,
   })
   // У продукта каталога своей строки нет — его «прошлые граммы» и так
   // найдутся по последней записи с этим catalogId.
-  if (item.foodId) await rememberLastGrams(item.foodId, grams)
+  if (item.foodId) await rememberLastGrams(item.foodId, grams, pieces)
   void runSync()
   return id
 }
@@ -87,9 +95,16 @@ export async function lastTreatChoice(item: PickItem): Promise<boolean> {
   return last?.treat === true
 }
 
-export async function updateEntryGrams(id: string, grams: number, treat?: boolean): Promise<void> {
+/** pieces: число — теперь штуками, null — граммами, не передан — не трогаем. */
+export async function updateEntryGrams(id: string, grams: number, treat?: boolean, pieces?: number | null): Promise<void> {
   const now = new Date().toISOString()
-  await db.entries.update(id, { grams, ...(treat === undefined ? {} : { treat }), updatedAt: now, dirty: true })
+  await db.entries.update(id, {
+    grams,
+    ...(treat === undefined ? {} : { treat }),
+    ...(pieces === undefined ? {} : { pieces }),
+    updatedAt: now,
+    dirty: true,
+  })
   void runSync()
 }
 

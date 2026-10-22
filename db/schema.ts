@@ -113,6 +113,11 @@ export const foods = pgTable(
     sourceCatalogId: text('source_catalog_id'),
     /** Граммы с прошлого раза — подстановка в окно ввода. */
     lastGrams: real('last_grams'),
+    /** Вес 1 штуки, г — тогда продукт можно добавлять штуками (владелица,
+     * 22.10: «вода 1 кокоса»). Пусто — только граммами. */
+    pieceGrams: real('piece_grams'),
+    /** Сколько штук брали в прошлый раз (если штуками) — как lastGrams. */
+    lastPieces: real('last_pieces'),
     ...syncColumns,
   },
   (t) => [index('foods_user_sync_idx').on(t.userId, t.serverUpdatedAt)],
@@ -336,6 +341,9 @@ export const entries = pgTable(
     // строку истории). Сама запись и продукт остаются; новая запись того же
     // продукта снова покажет его в истории
     historyHidden: boolean('history_hidden').notNull().default(false),
+    // Добавлено штуками: сколько штук (граммы — в grams, уже пересчитаны по
+    // весу штуки на тот момент). Пусто — добавлено граммами
+    pieces: real('pieces'),
     ...syncColumns,
   },
   (t) => [index('entries_user_sync_idx').on(t.userId, t.serverUpdatedAt)],

@@ -18,6 +18,8 @@ interface WireFood {
   note: string | null
   sourceCatalogId: string | null
   lastGrams: number | null
+  pieceGrams?: number | null // нет у старых клиентов
+  lastPieces?: number | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -108,6 +110,7 @@ interface WireEntry {
   grams: number
   treat?: boolean // нет у старых клиентов — false
   historyHidden?: boolean // то же
+  pieces?: number | null // то же
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -218,6 +221,8 @@ function wireFood(f: typeof foods.$inferSelect) {
     note: f.note,
     sourceCatalogId: f.sourceCatalogId,
     lastGrams: f.lastGrams,
+    pieceGrams: f.pieceGrams,
+    lastPieces: f.lastPieces,
     createdAt: f.createdAt.toISOString(),
     updatedAt: f.updatedAt.toISOString(),
     deletedAt: f.deletedAt?.toISOString() ?? null,
@@ -254,6 +259,7 @@ function wireEntry(e: typeof entries.$inferSelect) {
     grams: e.grams,
     treat: e.treat,
     historyHidden: e.historyHidden,
+    pieces: e.pieces,
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),
     deletedAt: e.deletedAt?.toISOString() ?? null,
@@ -458,6 +464,8 @@ async function upsertFoods(db: Db, userId: number, rows: WireFood[]): Promise<st
         note: f.note,
         sourceCatalogId: f.sourceCatalogId,
         lastGrams: f.lastGrams,
+        pieceGrams: f.pieceGrams ?? null,
+        lastPieces: f.lastPieces ?? null,
         createdAt: new Date(f.createdAt),
         updatedAt: new Date(f.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -478,6 +486,8 @@ async function upsertFoods(db: Db, userId: number, rows: WireFood[]): Promise<st
         note: sql`excluded.note`,
         sourceCatalogId: sql`excluded.source_catalog_id`,
         lastGrams: sql`excluded.last_grams`,
+        pieceGrams: sql`excluded.piece_grams`,
+        lastPieces: sql`excluded.last_pieces`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
@@ -562,6 +572,7 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
         grams: e.grams,
         treat: e.treat ?? false,
         historyHidden: e.historyHidden ?? false,
+        pieces: e.pieces ?? null,
         createdAt: new Date(e.createdAt),
         updatedAt: new Date(e.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -585,6 +596,7 @@ async function upsertEntries(db: Db, userId: number, rows: WireEntry[]): Promise
         grams: sql`excluded.grams`,
         treat: sql`excluded.treat`,
         historyHidden: sql`excluded.history_hidden`,
+        pieces: sql`excluded.pieces`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,
