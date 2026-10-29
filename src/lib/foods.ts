@@ -119,5 +119,15 @@ export function macrosPer100FromForm(
   }
 }
 
+/**
+ * Ккал из формы — на 100 г. «На порцию» пересчитываем так же, как БЖУ:
+ * раньше пересчитывались только Б/Ж/У, а ккал порции сохранялись как ккал
+ * на 100 г (владелица, 28.10: кофе 80 ккал на банку 238 г стал 190 ккал).
+ */
+export function kcalPer100FromForm(mode: 'per100' | 'perServing', servingGrams: number, kcal: number): number {
+  if (mode === 'per100' || servingGrams <= 0) return kcal
+  return perServingToPer100(kcal, servingGrams)
+}
+
 export { kcalFromMacros, macrosExceed100, parseDecimal }
 export type { Food }

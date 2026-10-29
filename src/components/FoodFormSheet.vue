@@ -11,6 +11,7 @@ import { withBrand, type PickItem } from '../lib/pick'
 import {
   countFoodEntries,
   createFood,
+  kcalPer100FromForm,
   kcalFromMacros,
   macrosExceed100,
   macrosPer100FromForm,
@@ -57,7 +58,12 @@ const fatInput = ref(src ? String(src.fat) : '')
 const carbsInput = ref(src ? String(src.carbs) : '')
 const kcalInput = ref(src ? String(src.kcal) : '')
 
-const servingGrams = computed(() => parseDecimal(servingGramsInput.value) ?? 0)
+// Граммы порции не вписаны, а вес 1 шт есть — порция = 1 шт (владелица,
+// 28.10: «на порцию» без граммов сохранялось как «на 100 г», и 1 шт кофе
+// считалась криво). Нет ни того, ни другого — сохранить нельзя
+const servingGrams = computed(() => parseDecimal(servingGramsInput.value) ?? pieceGrams.value ?? 0)
+const perServing = computed(() => props.kind === 'product' && servingMode.value === 'perServing')
+const servingMissing = computed(() => perServing.value && servingGrams.value <= 0)
 const protein = computed(() => parseDecimal(proteinInput.value) ?? 0)
 const fat = computed(() => parseDecimal(fatInput.value) ?? 0)
 const carbs = computed(() => parseDecimal(carbsInput.value) ?? 0)
@@ -69,11 +75,15 @@ const per100 = computed(() =>
 const computedKcal = computed(() => kcalFromMacros(per100.value.protein, per100.value.fat, per100.value.carbs))
 
 const enteredKcal = computed(() => parseDecimal(kcalInput.value))
+// Ккал из БЖУ в тех же единицах, что поля формы: на 100 г или на порцию
+const computedKcalShown = computed(() =>
+  perServing.value && servingGrams.value > 0 ? (computedKcal.value * servingGrams.value) / 100 : computedKcal.value,
+)
 const exceeds100 = computed(() => macrosExceed100(per100.value.protein, per100.value.fat, per100.value.carbs))
 const kcalMismatch = computed(() => {
-  if (enteredKcal.value === null || computedKcal.value === 0) return null
-  const diff = Math.abs(enteredKcal.value - computedKcal.value) / computedKcal.value
-  return diff > 0.1 ? Math.round(computedKcal.value) : null
+  if (enteredKcal.value === null || computedKcalShown.value === 0) return null
+  const diff = Math.abs(enteredKcal.value - computedKcalShown.value) / computedKcalShown.value
+  return diff > 0.1 ? Math.round(computedKcalShown.value) : null
 })
 
 // Без названия и БЖУ сохранить нельзя — ккал единственное необязательное,
@@ -81,18 +91,22 @@ const kcalMismatch = computed(() => {
 const canSave = computed(
   () =>
     name.value.trim().length > 0 &&
+    !servingMissing.value &&
     parseDecimal(proteinInput.value) !== null &&
     parseDecimal(fatInput.value) !== null &&
     parseDecimal(carbsInput.value) !== null,
 )
 
 function fillKcalFromMacros() {
-  kcalInput.value = String(Math.round(computedKcal.value))
+  kcalInput.value = String(Math.round(computedKcalShown.value))
 }
 
 async function save(addNow: boolean) {
   if (!canSave.value) return
-  const kcal = enteredKcal.value ?? computedKcal.value
+  const kcal =
+    enteredKcal.value === null
+      ? computedKcal.value
+      : kcalPer100FromForm(perServing.value ? 'perServing' : 'per100', servingGrams.value, enteredKcal.value)
   const draft = {
     kind: props.kind,
     name: name.value.trim(),
@@ -103,7 +117,9 @@ async function save(addNow: boolean) {
     carbs: per100.value.carbs,
     kcal,
     note: props.kind === 'dish' && note.value.trim() ? note.value.trim() : null,
-    pieceGrams: pieceGrams.value,
+    // Вес штуки не вписан, а КБЖУ на порцию — порция = 1 шт: «1 шт» в
+    // дневнике тогда ровно порция с этикетки
+    pieceGrams: pieceGrams.value ?? (perServing.value && servingGrams.value > 0 ? servingGrams.value : null),
   }
   let id: string
   if (props.food && saveAsCopy.value) {
@@ -192,9 +208,12 @@ function onBarcodeScanned(code: string) {
           v-model="servingGramsInput"
           type="text"
           inputmode="decimal"
-          placeholder="Граммы порции"
+          :placeholder="pieceGrams ? `Граммы порции (сейчас = 1 шт, ${pieceGrams} г)` : 'Граммы порции'"
           class="mt-1 rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
+        <p v-if="servingMissing" class="text-xs text-amber-600">
+          Укажите граммы порции (или вес 1 шт ниже) — без них КБЖУ не пересчитать на 100 г
+        </p>
       </div>
 
       <!-- Поля формы — Б Ж У, как на этикетках (владелица); везде в
@@ -218,7 +237,7 @@ function onBarcodeScanned(code: string) {
       <div class="flex items-end gap-2">
         <label class="flex-1 flex flex-col gap-1">
           <span class="text-xs text-muted">Ккал</span>
-          <input v-model="kcalInput" type="text" inputmode="decimal" :placeholder="String(Math.round(computedKcal))" class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
+          <input v-model="kcalInput" type="text" inputmode="decimal" :placeholder="String(Math.round(computedKcalShown))" class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent" />
         </label>
         <button type="button" @click="fillKcalFromMacros" class="rounded-2xl border border-line px-3 py-3 text-xs text-ink shrink-0">
           = из БЖУ
