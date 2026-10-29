@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ChevronDown, ScanLine } from '@lucide/vue'
+import { ArrowLeft, ChevronDown, Plus, ScanLine } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddEntrySheet from '../components/AddEntrySheet.vue'
@@ -386,20 +386,28 @@ function titleFor(item: PickItem): string {
         </div>
       </template>
 
+      <!-- «Новый продукт/блюдо» — над списком, а не под ним: к низу длинного
+           списка не долистаешься (владелица, 29.10) -->
       <template v-else-if="tab === 'products'">
-        <div class="rounded-2xl glass overflow-hidden mb-3">
+        <button type="button" @click="creatingKind = 'product'" class="w-full mb-3 rounded-2xl border border-dashed border-line py-2.5 text-sm font-medium text-ink flex items-center justify-center gap-1.5">
+          <Plus :size="16" />
+          Новый продукт
+        </button>
+        <div class="rounded-2xl glass overflow-hidden">
           <p v-if="productRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
           <FoodListRow v-for="item in productRows" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
-        <button type="button" @click="creatingKind = 'product'" class="text-sm text-accent px-1">+ Новый продукт</button>
       </template>
 
       <template v-else-if="tab === 'dishes'">
-        <div class="rounded-2xl glass overflow-hidden mb-3">
+        <button type="button" @click="creatingKind = 'dish'" class="w-full mb-3 rounded-2xl border border-dashed border-line py-2.5 text-sm font-medium text-ink flex items-center justify-center gap-1.5">
+          <Plus :size="16" />
+          Новое блюдо
+        </button>
+        <div class="rounded-2xl glass overflow-hidden">
           <p v-if="dishRows.length === 0" class="px-4 py-3 text-sm text-muted">Ничего нет</p>
           <FoodListRow v-for="item in dishRows" :key="item.key" :title="titleFor(item)" v-bind="rowBind(item)" v-on="rowOn(item)" />
         </div>
-        <button type="button" @click="creatingKind = 'dish'" class="text-sm text-accent px-1">+ Новое блюдо</button>
       </template>
 
       <!-- База без запроса: сам каталог — сотни тысяч строк, листать нечего, только искать -->
