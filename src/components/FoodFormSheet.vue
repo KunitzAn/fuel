@@ -52,16 +52,16 @@ const pieceGrams = computed(() => {
 // Хранится всегда на 100 г — при правке нет смысла угадывать, вводили ли
 // когда-то «на порцию», просто показываем уже пересчитанное.
 const servingMode = ref<'per100' | 'perServing'>('per100')
-const servingGramsInput = ref('')
 const proteinInput = ref(src ? String(src.protein) : '')
 const fatInput = ref(src ? String(src.fat) : '')
 const carbsInput = ref(src ? String(src.carbs) : '')
 const kcalInput = ref(src ? String(src.kcal) : '')
 
-// Граммы порции не вписаны, а вес 1 шт есть — порция = 1 шт (владелица,
-// 28.10: «на порцию» без граммов сохранялось как «на 100 г», и 1 шт кофе
-// считалась криво). Нет ни того, ни другого — сохранить нельзя
-const servingGrams = computed(() => parseDecimal(servingGramsInput.value) ?? pieceGrams.value ?? 0)
+// Порция и штука — одно и то же (владелица, 29.10): одно поле «граммов в
+// порции (1 шт)». КБЖУ «на порцию» пересчитываем по нему на 100 г; без
+// него в этом режиме сохранить нельзя (раньше сохранялось как «на 100 г»,
+// и 1 шт кофе считалась криво)
+const servingGrams = computed(() => pieceGrams.value ?? 0)
 const perServing = computed(() => props.kind === 'product' && servingMode.value === 'perServing')
 const servingMissing = computed(() => perServing.value && servingGrams.value <= 0)
 const protein = computed(() => parseDecimal(proteinInput.value) ?? 0)
@@ -75,6 +75,12 @@ const per100 = computed(() =>
 const computedKcal = computed(() => kcalFromMacros(per100.value.protein, per100.value.fat, per100.value.carbs))
 
 const enteredKcal = computed(() => parseDecimal(kcalInput.value))
+// «На порцию» — что получится на 100 г, чтобы было видно пересчёт
+const per100Hint = computed(() => {
+  if (!perServing.value || parseDecimal(carbsInput.value) === null) return ''
+  const k = enteredKcal.value === null ? computedKcal.value : kcalPer100FromForm('perServing', servingGrams.value, enteredKcal.value)
+  return `Б ${per100.value.protein} · Ж ${per100.value.fat} · У ${per100.value.carbs} · ${Math.round(k * 10) / 10} ккал`
+})
 // Ккал из БЖУ в тех же единицах, что поля формы: на 100 г или на порцию
 const computedKcalShown = computed(() =>
   perServing.value && servingGrams.value > 0 ? (computedKcal.value * servingGrams.value) / 100 : computedKcal.value,
@@ -117,9 +123,8 @@ async function save(addNow: boolean) {
     carbs: per100.value.carbs,
     kcal,
     note: props.kind === 'dish' && note.value.trim() ? note.value.trim() : null,
-    // Вес штуки не вписан, а КБЖУ на порцию — порция = 1 шт: «1 шт» в
-    // дневнике тогда ровно порция с этикетки
-    pieceGrams: pieceGrams.value ?? (perServing.value && servingGrams.value > 0 ? servingGrams.value : null),
+    // «1 шт» в дневнике — ровно порция с этикетки
+    pieceGrams: pieceGrams.value,
   }
   let id: string
   if (props.food && saveAsCopy.value) {
@@ -202,19 +207,27 @@ function onBarcodeScanned(code: string) {
             на порцию
           </button>
         </div>
-        <!-- Азиатские этикетки часто пишут «Serving size 30 g» — вбиваем как есть, храним на 100 г -->
+      </div>
+
+      <!-- Порция = 1 шт (владелица): одно поле на оба смысла. «На порцию» —
+           обязательно, по нему КБЖУ пересчитываются на 100 г (этикетки вроде
+           «Serving size 30 g»); «на 100 г» — необязательно, чтобы добавлять
+           штуками. Можно вписать и потом, прямо в окне граммов -->
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-muted">
+          <template v-if="perServing">Граммов в порции (= 1 шт)*</template>
+          <template v-else>Граммов в порции (= 1 шт) — чтобы добавлять штуками, необязательно</template>
+        </span>
         <input
-          v-if="servingMode === 'perServing'"
-          v-model="servingGramsInput"
+          v-model="pieceGramsInput"
           type="text"
           inputmode="decimal"
-          :placeholder="pieceGrams ? `Граммы порции (сейчас = 1 шт, ${pieceGrams} г)` : 'Граммы порции'"
-          class="mt-1 rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
+          :placeholder="kind === 'product' ? 'например, 238' : 'например, 60'"
+          class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
         />
-        <p v-if="servingMissing" class="text-xs text-amber-600">
-          Укажите граммы порции (или вес 1 шт ниже) — без них КБЖУ не пересчитать на 100 г
-        </p>
-      </div>
+        <span v-if="servingMissing" class="text-xs text-amber-600">Без граммов порции КБЖУ не пересчитать на 100 г</span>
+        <span v-else-if="perServing && per100Hint" class="text-xs text-muted">На 100 г выйдет: {{ per100Hint }}</span>
+      </label>
 
       <!-- Поля формы — Б Ж У, как на этикетках (владелица); везде в
            остальных местах порядок Ж У Б -->
@@ -245,18 +258,6 @@ function onBarcodeScanned(code: string) {
       </div>
       <p v-if="kcalMismatch !== null" class="text-xs text-muted -mt-2">По БЖУ выходит {{ kcalMismatch }} — не ошибка, просто на всякий случай</p>
 
-      <!-- Штуки (владелица, 22.10): вес одной штуки — и в окне граммов
-           появится «шт». Можно вписать и потом, прямо в окне граммов -->
-      <label class="flex flex-col gap-1">
-        <span class="text-xs text-muted">Вес 1 шт, г — чтобы добавлять штуками (необязательно)</span>
-        <input
-          v-model="pieceGramsInput"
-          type="text"
-          inputmode="decimal"
-          :placeholder="kind === 'product' ? 'например, 300' : 'например, 60'"
-          class="rounded-2xl glass px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-accent"
-        />
-      </label>
 
       <label v-if="kind === 'dish'" class="flex flex-col gap-1">
         <span class="text-xs text-muted">Заметка (из чего и в каких пропорциях — в расчётах не участвует)</span>

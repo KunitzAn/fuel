@@ -113,9 +113,9 @@ export function macrosPer100FromForm(
 ): { protein: number; fat: number; carbs: number } {
   if (mode === 'per100' || servingGrams <= 0) return { protein, fat, carbs }
   return {
-    protein: perServingToPer100(protein, servingGrams),
-    fat: perServingToPer100(fat, servingGrams),
-    carbs: perServingToPer100(carbs, servingGrams),
+    protein: round1(perServingToPer100(protein, servingGrams)),
+    fat: round1(perServingToPer100(fat, servingGrams)),
+    carbs: round1(perServingToPer100(carbs, servingGrams)),
   }
 }
 
@@ -126,7 +126,12 @@ export function macrosPer100FromForm(
  */
 export function kcalPer100FromForm(mode: 'per100' | 'perServing', servingGrams: number, kcal: number): number {
   if (mode === 'per100' || servingGrams <= 0) return kcal
-  return perServingToPer100(kcal, servingGrams)
+  return round1(perServingToPer100(kcal, servingGrams))
+}
+
+/** Пересчитанное с порции на 100 г — до 1 знака после запятой (владелица). */
+function round1(n: number): number {
+  return Math.round(n * 10) / 10
 }
 
 export { kcalFromMacros, macrosExceed100, parseDecimal }
