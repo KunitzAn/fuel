@@ -17,6 +17,10 @@ const entries = useLiveQuery(() => db.entries.filter((e) => e.deletedAt === null
 const activities = useLiveQuery(() => db.activities.filter((a) => a.deletedAt === null).toArray(), [])
 const health = useLiveQuery(() => db.dailyActiveEnergy.filter((r) => r.deletedAt === null).toArray(), [])
 const goalSettings = useLiveQuery(() => db.goalSettings.filter((g) => g.deletedAt === null).toArray(), [])
+const bingeDates = useLiveQuery(
+  async () => (await db.dayTypes.filter((d) => d.deletedAt === null && d.binge === true).toArray()).map((d) => d.date),
+  [],
+)
 
 const summarize = computed(() =>
   createDaySummarizer({
@@ -24,6 +28,7 @@ const summarize = computed(() =>
     activities: activities.value,
     health: health.value,
     goalSettings: goalSettings.value,
+    bingeDates: bingeDates.value,
   }),
 )
 const earliest = computed(() => earliestEntryDate(entries.value))

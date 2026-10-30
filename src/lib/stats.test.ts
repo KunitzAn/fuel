@@ -46,6 +46,7 @@ const source: StatsSource = {
   activities: [{ date: '2026-09-21', kcal: 200 }],
   health: [{ date: '2026-09-21', totalActiveKcal: 300 }],
   goalSettings: [settings],
+  bingeDates: [],
 }
 
 describe('createDaySummarizer', () => {
@@ -134,9 +135,24 @@ describe('periodAverages', () => {
     expect(avg.treat!.kcal).toBe(305 / 2)
   })
 
+  it('день зажора: цифр и разницы нет, расход есть; в средние не входит', () => {
+    const summarizeBinge = createDaySummarizer({ ...source, bingeDates: ['2026-09-21'] })
+    const s = summarizeBinge('2026-09-21')
+    expect(s.binge).toBe(true)
+    expect(s.spentKcal).toBe(2000)
+    expect(s.differenceKcal).toBeNull()
+    const avg = periodAverages(['2026-08-30', '2026-09-21'].map(summarizeBinge), '2026-09-22')
+    expect(avg.days).toBe(1) // только 30.08
+    expect(avg.bingeDays).toBe(1)
+    expect(avg.eaten!.kcal).toBe(305)
+    expect(avg.spentKcal).toBeNull() // у 30.08 цели нет, а 21.09 — зажор
+    expect(avg.totalDifferenceKcal).toBeNull()
+  })
+
   it('ни одного дня — всё null', () => {
     expect(periodAverages([summarize('2026-09-23')], '2026-09-30')).toEqual({
       days: 0,
+      bingeDays: 0,
       eaten: null,
       treat: null,
       spentKcal: null,

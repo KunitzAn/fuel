@@ -92,6 +92,13 @@
       "when": 1792671501275,
       "tag": "0012_milky_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793344149581,
+      "tag": "0013_loud_sentinel",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,7 @@
   --lunch: #ff3d8b;
   --dinner: #2f7bff;
   --snack: #10bfae;
+  --binge: #a53ff0;
 
   --glass-border: rgb(255 255 255 / 0.75);
   --glass-shadow: 0 1px 0 rgb(255 255 255 / 0.9) inset, 0 10px 30px -8px rgb(60 40 110 / 0.16),
@@ -65,6 +66,7 @@
     --lunch: #ff5c9e;
     --dinner: #5b98ff;
     --snack: #22d3c0;
+    --binge: #c27bff;
 
     --glass-border: rgb(255 255 255 / 0.08);
     --glass-shadow: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 12px 30px -10px rgb(0 0 0 / 0.6);
@@ -72,6 +74,25 @@
     --blob-b: rgb(40 150 100 / 0.2);
     --blob-c: rgb(110 90 220 / 0.24);
     --blob-d: rgb(200 160 40 / 0.16);
+  }
+}
+
+/* День зажора (владелица, 30.10): весь дневник этого дня — в фиолетовом.
+   Класс на <html> ставит DiaryView, пока открыт такой день */
+:root.binge-day {
+  --bg: #f3ebfb;
+  --blob-a: rgb(214 160 255 / 0.6);
+  --blob-b: rgb(190 140 250 / 0.5);
+  --blob-c: rgb(165 63 240 / 0.35);
+  --blob-d: rgb(230 190 255 / 0.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root.binge-day {
+    --bg: #1c1229;
+    --blob-a: rgb(160 70 235 / 0.42);
+    --blob-b: rgb(130 60 215 / 0.38);
+    --blob-c: rgb(180 85 250 / 0.4);
+    --blob-d: rgb(120 50 195 / 0.34);
   }
 }
 
@@ -93,6 +114,7 @@
   --color-lunch: var(--lunch);
   --color-dinner: var(--dinner);
   --color-snack: var(--snack);
+  --color-binge: var(--binge);
 }
 
 /*

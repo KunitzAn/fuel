@@ -11,6 +11,8 @@ export interface ChartBar {
   date: string
   value: number | null
   today: boolean
+  /** День зажора — столбика нет, на нуле фиолетовая точка. */
+  binge?: boolean
 }
 
 const props = defineProps<{
@@ -148,6 +150,12 @@ function showValue(b: ChartBar) {
               class="absolute rounded-[2px]"
               :class="[bars.length > 40 ? 'inset-x-px' : 'inset-x-[18%]', b.today ? 'opacity-40' : '']"
               :style="{ ...barStyle(b.value), backgroundColor: barColor(b.value) }"
+            />
+            <span
+              v-if="b.binge"
+              class="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-binge"
+              :class="bars.length > 40 ? 'w-1 h-1' : 'w-1.5 h-1.5'"
+              :style="{ top: `${yPct(0)}%` }"
             />
             <span
               v-if="showValue(b)"

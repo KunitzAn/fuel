@@ -145,6 +145,8 @@ export interface DayType {
   plannedDeltaFat: number | null
   plannedDeltaCarbs: number | null
   actual: 'low' | 'high' | null
+  /** День зажора — в статистику не идёт (lib/stats.ts). Нет у строк до SYNC_SCHEMA 7. */
+  binge?: boolean
   createdAt: string
   updatedAt: string
   deletedAt: string | null

@@ -213,19 +213,22 @@ export function manualDayTypeDelta(kind: DayTypeKind, settings: GoalInput): DayT
  * единой записи в `entries` из среднего исключаются (иначе занизили бы
  * его нулём, хотя на самом деле просто не открывала приложение). Без базы
  * вычитать не из чего — `null` (тот же случай, что и «нет цели вообще»).
+ * Дни зажора не берём: еду там не считала, среднее бы исказилось.
  */
 export function statsDayTypeDelta(
   kind: DayTypeKind,
   base: Pick<GoalInput, 'baseProtein' | 'baseFat' | 'baseCarbs'>,
   entries: Pick<Entry, 'date' | 'protein' | 'fat' | 'carbs' | 'kcal' | 'grams'>[],
-  dayTypeRows: Pick<DayType, 'date' | 'actual'>[],
+  dayTypeRows: Pick<DayType, 'date' | 'actual' | 'binge'>[],
   periodDays: number | null,
   today: string,
 ): DayTypeDelta | null {
   if (base.baseProtein === null || base.baseFat === null || base.baseCarbs === null) return null
   const cutoff = periodDays !== null ? shiftDate(today, -periodDays) : null
   const matchingDates = new Set(
-    dayTypeRows.filter((d) => d.actual === kind && d.date < today && (!cutoff || d.date >= cutoff)).map((d) => d.date),
+    dayTypeRows
+      .filter((d) => d.actual === kind && !d.binge && d.date < today && (!cutoff || d.date >= cutoff))
+      .map((d) => d.date),
   )
   if (matchingDates.size === 0) return null
 

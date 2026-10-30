@@ -89,6 +89,7 @@ interface WireDayType {
   plannedDeltaFat: number | null
   plannedDeltaCarbs: number | null
   actual: 'low' | 'high' | null
+  binge?: boolean // нет у клиентов до SYNC_SCHEMA 7
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -324,6 +325,7 @@ function wireDayType(d: typeof dayTypes.$inferSelect) {
     plannedDeltaFat: d.plannedDeltaFat,
     plannedDeltaCarbs: d.plannedDeltaCarbs,
     actual: d.actual,
+    binge: d.binge,
     createdAt: d.createdAt.toISOString(),
     updatedAt: d.updatedAt.toISOString(),
     deletedAt: d.deletedAt?.toISOString() ?? null,
@@ -743,6 +745,7 @@ async function upsertDayTypes(db: Db, userId: number, rows: WireDayType[]): Prom
         plannedDeltaFat: d.plannedDeltaFat,
         plannedDeltaCarbs: d.plannedDeltaCarbs,
         actual: d.actual,
+        binge: d.binge ?? false,
         createdAt: new Date(d.createdAt),
         updatedAt: new Date(d.updatedAt),
         serverUpdatedAt: sql`now()`,
@@ -758,6 +761,7 @@ async function upsertDayTypes(db: Db, userId: number, rows: WireDayType[]): Prom
         plannedDeltaFat: sql`excluded.planned_delta_fat`,
         plannedDeltaCarbs: sql`excluded.planned_delta_carbs`,
         actual: sql`excluded.actual`,
+        binge: sql`excluded.binge`,
         updatedAt: sql`excluded.updated_at`,
         serverUpdatedAt: sql`now()`,
         deletedAt: sql`excluded.deleted_at`,

@@ -306,6 +306,9 @@ export const dayTypes = pgTable(
     plannedDeltaFat: real('planned_delta_fat'),
     plannedDeltaCarbs: real('planned_delta_carbs'),
     actual: text('actual'), // 'low' | 'high' | null — по факту, в конце дня
+    /** День зажора (владелица, 30.10): записи остаются в дневнике, но в
+     * статистику день не идёт — только «расход». */
+    binge: boolean('binge').notNull().default(false),
     ...syncColumns,
   },
   (t) => [

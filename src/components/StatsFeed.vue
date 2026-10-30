@@ -67,7 +67,13 @@ function signed(n: number): string {
         <span class="block text-[11px] text-muted">{{ weekday(row.date) }}</span>
       </span>
 
-      <span v-if="!row.hasEntries" class="col-span-6 self-center text-center text-xs text-muted">— нет записей —</span>
+      <!-- Зажор (владелица, 30.10): вместо цифр — «зажор», расход оставляем, разницы нет -->
+      <template v-if="row.binge">
+        <span class="col-span-4 text-center text-xs font-medium text-binge">зажор</span>
+        <span class="text-[13px] text-ink">{{ row.spentKcal === null ? '—' : int(row.spentKcal) }}</span>
+        <span />
+      </template>
+      <span v-else-if="!row.hasEntries" class="col-span-6 self-center text-center text-xs text-muted">— нет записей —</span>
       <template v-else>
         <!-- Только факт, без цели дня (владелица) -->
         <span class="text-[13px] font-semibold text-fat">{{ int(row.eaten.fat) }}</span>

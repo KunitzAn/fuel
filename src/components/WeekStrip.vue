@@ -8,6 +8,8 @@ const props = defineProps<{
   date: string
   /** Даты (YYYY-MM-DD) недели, где есть хотя бы одна не удалённая запись. */
   datesWithEntries: Set<string>
+  /** Дни зажора — точка фиолетовая (даже без записей). */
+  bingeDates: Set<string>
 }>()
 
 const emit = defineEmits<{ select: [date: string] }>()
@@ -41,7 +43,7 @@ const swipe = useSwipe(nextWeek, prevWeek)
         type="button"
         @click="emit('select', day)"
         class="flex flex-col items-center gap-1 w-9 py-1.5 rounded-xl"
-        :class="day === props.date ? 'bg-accent text-white' : 'text-ink'"
+        :class="day === props.date ? (bingeDates.has(day) ? 'bg-binge text-white' : 'bg-accent text-white') : 'text-ink'"
       >
         <span class="text-[11px] uppercase" :class="day === props.date ? 'text-white/80' : 'text-muted'">
           {{ WEEKDAY_LABELS[i] }}
@@ -50,7 +52,9 @@ const swipe = useSwipe(nextWeek, prevWeek)
         <span
           class="w-1 h-1 rounded-full"
           :class="[
-            datesWithEntries.has(day) ? (day === props.date ? 'bg-white' : 'bg-accent') : 'bg-transparent',
+            day === props.date
+              ? datesWithEntries.has(day) || bingeDates.has(day) ? 'bg-white' : 'bg-transparent'
+              : bingeDates.has(day) ? 'bg-binge' : datesWithEntries.has(day) ? 'bg-accent' : 'bg-transparent',
           ]"
         />
         <span v-if="day === today && day !== props.date" class="sr-only">сегодня</span>

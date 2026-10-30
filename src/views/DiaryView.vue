@@ -9,7 +9,7 @@ import MealCard from '../components/MealCard.vue'
 import SnackCard from '../components/SnackCard.vue'
 import WeekStrip from '../components/WeekStrip.vue'
 import { capitalizeFirst, formatDateWithWeekday, todayLocalDate, weekDates } from '../lib/date'
-import { setActualDayType, setPlannedDayType, type DayTypePlan } from '../lib/dayTypes'
+import { setActualDayType, setBingeDay, setPlannedDayType, type DayTypePlan } from '../lib/dayTypes'
 import {
   byCreatedAt,
   bySnackPosition,
@@ -30,6 +30,7 @@ import {
 } from '../lib/goals'
 import { scaleByGrams, sumMacros } from '../lib/nutrition'
 import { TREAT_LABEL_PLURAL, TreatIcon } from '../lib/treat'
+import { offerUndo } from '../lib/undo'
 import { useLiveQuery } from '../lib/useLiveQuery'
 
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner']
@@ -111,6 +112,19 @@ function pickFact(kind: DayTypeKind | null) {
   void setActualDayType(date.value, kind)
 }
 
+// День зажора (владелица, 30.10): записанное остаётся, но цели нет —
+// только цифры; в статистику день не идёт (lib/stats.ts). Весь дневник
+// этого дня — фиолетовый: класс на <html> меняет фон (style.css)
+const binge = computed(() => dayType.value?.binge === true)
+watch(binge, (on) => document.documentElement.classList.toggle('binge-day', on), { immediate: true })
+onBeforeUnmount(() => document.documentElement.classList.remove('binge-day'))
+function toggleBinge() {
+  const on = !binge.value
+  const d = date.value
+  void setBingeDay(d, on)
+  offerUndo(on ? 'День отмечен как зажор' : 'Отметка зажора снята', () => setBingeDay(d, !on))
+}
+
 const dayEntries = computed(() => allEntries.value.filter((e) => e.date === date.value).sort(byCreatedAt))
 const dayTotals = computed(() =>
   sumMacros(dayEntries.value.map((e) => scaleByGrams(e, e.grams))),
@@ -141,7 +155,7 @@ const macroCells = computed(() => {
   const maxes = s ? effectiveMaxBounds(s, dayActivity.value) : null
   return MACRO_CELLS.map((c) => {
     const value = dayTotals.value[c.key]
-    const goal = dayGoal.value ? dayGoal.value[c.key] : null
+    const goal = dayGoal.value && !binge.value ? dayGoal.value[c.key] : null
     const min = s?.[BOUND_KEYS[c.key].min] ?? null
     const max = maxes?.[BOUND_KEYS[c.key].max] ?? null
     const scale = goal ?? max ?? min
@@ -325,6 +339,7 @@ const datesWithEntries = computed(() => {
   const week = new Set(weekDates(date.value))
   return new Set(allEntries.value.filter((e) => week.has(e.date)).map((e) => e.date))
 })
+const bingeDates = computed(() => new Set(allDayTypes.value.filter((d) => d.binge).map((d) => d.date)))
 
 const headerTitle = computed(() =>
   date.value === today ? 'Сегодня' : capitalizeFirst(formatDateWithWeekday(date.value)),
@@ -382,7 +397,7 @@ onBeforeRouteLeave((to) => {
       </div>
     </header>
 
-    <WeekStrip :date="date" :dates-with-entries="datesWithEntries" @select="selectDate" />
+    <WeekStrip :date="date" :dates-with-entries="datesWithEntries" :binge-dates="bingeDates" @select="selectDate" />
 
     <!-- Тип дня (этап 4.4, не из README) — план с утра, факт в конце.
          Свёрнут по умолчанию (владелица): в заголовке — что выбрано,
@@ -448,7 +463,11 @@ onBeforeRouteLeave((to) => {
       <div class="rounded-3xl glass glow-tr px-4 pt-3 pb-3.5 grid grid-cols-[1fr_1fr_1fr_1.2fr] gap-x-2.5"
         style="--glow: var(--kcal); background-color: color-mix(in srgb, var(--card-solid) 88%, transparent)"
       >
-        <div v-if="activityGoal" class="col-span-4 flex justify-center mb-2.5">
+        <!-- Зажор: цель и Факт/План не нужны — только что записано -->
+        <p v-if="binge" class="col-span-4 mb-2.5 flex items-center justify-center gap-1.5 text-xs font-medium text-binge">
+          <span class="w-1.5 h-1.5 rounded-full bg-binge" />День зажора — в статистику не идёт
+        </p>
+        <div v-else-if="activityGoal" class="col-span-4 flex justify-center mb-2.5">
           <div class="flex rounded-full glass p-0.5 text-xs">
             <button
               v-for="v in [{ k: 'fact', l: 'Факт', c: 'var(--breakfast)' }, { k: 'plan', l: 'План', c: 'var(--kcal)' }] as const"
@@ -469,7 +488,7 @@ onBeforeRouteLeave((to) => {
             ><span v-if="c.goal !== null" class="text-[11px] text-muted">/{{ c.goal }}</span>
           </p>
           <!-- Шкала: доля от цели, отметки — мин/макс границы (4.5) -->
-          <div class="relative mt-1.5 h-1.5 rounded-full" :style="{ backgroundColor: `color-mix(in srgb, ${c.color} 18%, transparent)` }">
+          <div v-if="!binge" class="relative mt-1.5 h-1.5 rounded-full" :style="{ backgroundColor: `color-mix(in srgb, ${c.color} 18%, transparent)` }">
             <div v-if="c.fill !== null" class="absolute inset-y-0 left-0 rounded-full" :style="{ width: `${c.fill}%`, backgroundColor: c.color }" />
             <div v-for="(t, i) in c.ticks" :key="i" class="absolute -top-0.5 -bottom-0.5 w-0.5 rounded-full bg-ink/40" :style="{ left: `${t}%` }" />
           </div>
@@ -519,7 +538,16 @@ onBeforeRouteLeave((to) => {
         :eaten-kcal="dayTotals.kcal"
         :daily-active-energy="dayDailyActiveEnergy"
         :health-connected="allDailyActiveEnergy.length > 0"
+        :binge="binge"
       />
+      <button
+        type="button"
+        @click="toggleBinge"
+        class="rounded-3xl border border-dashed py-3 text-sm font-medium flex items-center justify-center"
+        :class="binge ? 'border-binge/50 text-binge' : 'border-line text-muted'"
+      >
+        {{ binge ? 'Это не зажор' : 'Отметить как день зажора' }}
+      </button>
     </div>
 
     <DayPickerSheet v-if="pickingDay" @close="pickingDay = false" @pick="pickDay" />

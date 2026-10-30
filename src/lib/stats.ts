@@ -18,11 +18,17 @@ export interface StatsSource {
   activities: Pick<Activity, 'date' | 'kcal'>[]
   health: Pick<DailyActiveEnergy, 'date' | 'totalActiveKcal'>[]
   goalSettings: GoalSettings[]
+  /** Дни зажора (DayType.binge) — в статистику не идут, кроме расхода. */
+  bingeDates: string[]
 }
 
 export interface DaySummary {
   date: string
   hasEntries: boolean
+  /** День зажора (владелица, 30.10): еду не считала — в ленте вместо
+   * цифр «зажор», в графиках нет столбика, в средние не входит. Расход
+   * показываем. */
+  binge: boolean
   eaten: Macros
   /** Из съеденного — отмеченное как не основная еда (lib/treat.ts). */
   treat: Macros
@@ -49,6 +55,7 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
   const entriesByDate = groupByDate(source.entries)
   const activitiesByDate = groupByDate(source.activities)
   const healthByDate = new Map(source.health.map((h) => [h.date, h]))
+  const bingeDates = new Set(source.bingeDates)
 
   return (date) => {
     const dayEntries = entriesByDate.get(date) ?? []
@@ -60,14 +67,16 @@ export function createDaySummarizer(source: StatsSource): (date: string) => DayS
     // тренировки, без поправки запланированного типа дня
     const goal = settings ? computeDayGoal(settings, activity) : null
     const spentKcal = goal ? goal.spentKcal : null
+    const binge = bingeDates.has(date)
     return {
       date,
       hasEntries: dayEntries.length > 0,
+      binge,
       eaten,
       treat,
       goal,
       spentKcal,
-      differenceKcal: spentKcal === null ? null : eaten.kcal - spentKcal,
+      differenceKcal: spentKcal === null || binge ? null : eaten.kcal - spentKcal,
     }
   }
 }
@@ -119,8 +128,10 @@ export function statsPeriod(kind: StatsPeriodKind, today: string, offset: number
 }
 
 export interface PeriodAverages {
-  /** Сколько дней вошло: есть записи и день уже закончился (не сегодня/будущее). */
+  /** Сколько дней вошло: есть записи, не зажор и день уже закончился (не сегодня/будущее). */
   days: number
+  /** Сколько дней зажора в периоде — они в средние не вошли. */
+  bingeDays: number
   eaten: Macros | null
   /** Средняя доля «не основной» еды в день — из тех же дней, что и `eaten`. */
   treat: Macros | null
@@ -134,12 +145,14 @@ export interface PeriodAverages {
  * README: «дни без записей и сегодняшний (незаконченный) день в средние не
  * входят». Потрачено/разница — только по дням, где цель была настроена
  * (без покоя «потрачено» не посчитать), поэтому у них может быть меньше
- * дней, чем у «съедено».
+ * дней, чем у «съедено». Дни зажора не входят ни во что — даже в
+ * «потрачено», чтобы средняя разница = съедено − потрачено по тем же дням.
  */
 export function periodAverages(summaries: DaySummary[], today: string): PeriodAverages {
-  const counted = summaries.filter((s) => s.hasEntries && s.date < today)
+  const counted = summaries.filter((s) => s.hasEntries && !s.binge && s.date < today)
+  const bingeDays = summaries.filter((s) => s.binge).length
   if (counted.length === 0) {
-    return { days: 0, eaten: null, treat: null, spentKcal: null, differenceKcal: null, totalDifferenceKcal: null }
+    return { days: 0, bingeDays, eaten: null, treat: null, spentKcal: null, differenceKcal: null, totalDifferenceKcal: null }
   }
   const total = sumMacros(counted.map((s) => s.eaten))
   const treatTotal = sumMacros(counted.map((s) => s.treat))
@@ -149,6 +162,7 @@ export function periodAverages(summaries: DaySummary[], today: string): PeriodAv
   const diffSum = withSpent.reduce((sum, s) => sum + s.differenceKcal!, 0)
   return {
     days: n,
+    bingeDays,
     eaten: { protein: total.protein / n, fat: total.fat / n, carbs: total.carbs / n, kcal: total.kcal / n },
     treat: { protein: treatTotal.protein / n, fat: treatTotal.fat / n, carbs: treatTotal.carbs / n, kcal: treatTotal.kcal / n },
     spentKcal: withSpent.length ? spentSum / withSpent.length : null,

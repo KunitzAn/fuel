@@ -282,6 +282,16 @@ describe('statsDayTypeDelta', () => {
     expect(delta!.carbs).toBeCloseTo(260 - 150) // = 110, не (260+0)/2
   })
 
+  it('день зажора не в счёт', () => {
+    const dayTypeRows = [
+      { date: '2026-01-05', actual: 'high' as const },
+      { date: '2026-01-06', actual: 'high' as const, binge: true },
+    ]
+    const entries = [entry('2026-01-05', 260), entry('2026-01-06', 600)]
+    const delta = statsDayTypeDelta('high', base, entries, dayTypeRows, null, '2026-01-10')
+    expect(delta!.carbs).toBeCloseTo(260 - 150)
+  })
+
   it('период ограничивает выборку', () => {
     const dayTypeRows = [
       { date: '2025-01-01', actual: 'high' as const }, // старый, за периодом

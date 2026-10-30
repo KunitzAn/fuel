@@ -27,6 +27,7 @@ async function upsertDayType(date: string, patch: Partial<Omit<DayType, 'date' |
       plannedDeltaFat: null,
       plannedDeltaCarbs: null,
       actual: null,
+      binge: false,
       ...patch,
       updatedAt: now,
       deletedAt: null,
@@ -42,6 +43,7 @@ async function upsertDayType(date: string, patch: Partial<Omit<DayType, 'date' |
     plannedDeltaFat: null,
     plannedDeltaCarbs: null,
     actual: null,
+    binge: false,
     ...patch,
     createdAt: now,
     updatedAt: now,
@@ -75,5 +77,15 @@ export async function setPlannedDayType(date: string, plan: DayTypePlan | null):
 /** null — снять отметку факта. */
 export async function setActualDayType(date: string, actual: DayTypeKind | null): Promise<void> {
   await upsertDayType(date, { actual })
+  void runSync()
+}
+
+/**
+ * День зажора (владелица, 30.10): записи дня остаются в дневнике, но в
+ * статистику день не идёт — ни в ленту, ни в средние, ни в «по статистике»
+ * типа дня; показываем только расход.
+ */
+export async function setBingeDay(date: string, binge: boolean): Promise<void> {
+  await upsertDayType(date, { binge })
   void runSync()
 }

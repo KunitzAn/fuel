@@ -1,0 +1,1 @@
+ALTER TABLE "day_types" ADD COLUMN "binge" boolean DEFAULT false NOT NULL;

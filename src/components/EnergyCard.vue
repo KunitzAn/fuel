@@ -22,6 +22,8 @@ const props = defineProps<{
   // Из Здоровья не пришло ни одного дня — скорее всего, Команда не
   // настроена. Подсказка, чтобы не ждали, что активность придёт сама.
   healthConnected: boolean
+  /** День зажора — потрачено показываем, разницу нет (владелица, 30.10). */
+  binge?: boolean
 }>()
 
 const healthActiveKcal = computed(() => props.dailyActiveEnergy?.totalActiveKcal ?? null)
@@ -48,7 +50,7 @@ function runShortcut() {
         <Flame :size="16" class="text-(--card-color)" />
       </span>
       <h3 v-if="goal" class="text-sm text-ink flex-1">
-        Потрачено {{ Math.round(goal.spentKcal) }} · Разница {{ differenceLabel }}
+        Потрачено {{ Math.round(goal.spentKcal) }}<template v-if="!binge"> · Разница {{ differenceLabel }}</template>
       </h3>
       <h3 v-else class="text-sm text-ink flex-1">Активность</h3>
       <button type="button" @click="runShortcut" aria-label="Подтянуть тренировки" class="w-7 h-7 rounded-full flex items-center justify-center text-ink shrink-0">

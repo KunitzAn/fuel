@@ -58,8 +58,9 @@ function barsFor(key: Key): ChartBar[] {
     const s = summaries.value[i]
     return {
       date,
-      value: s && s.hasEntries ? s.eaten[key] : null,
+      value: s && s.hasEntries && !s.binge ? s.eaten[key] : null,
       today: date === props.today,
+      binge: s?.binge ?? false,
     }
   })
 }
@@ -70,6 +71,7 @@ const differenceBars = computed<ChartBar[]>(() =>
       date,
       value: s && s.hasEntries ? s.differenceKcal : null,
       today: date === props.today,
+      binge: s?.binge ?? false,
     }
   }),
 )
@@ -79,6 +81,7 @@ function select(date: string) {
   else selected.value = date
 }
 const valuesForAll = computed(() => kind.value === 'week')
+const selectedBinge = computed(() => summaries.value.find((s) => s?.date === selected.value)?.binge === true)
 
 const int = (n: number) => Math.round(n).toLocaleString('ru-RU')
 function signed(n: number): string {
@@ -166,18 +169,25 @@ const axis = computed(() => {
           {{ int(averages.treat.carbs) }} · Б {{ int(averages.treat.protein) }}; основная еда —
           {{ int(averages.eaten!.kcal - averages.treat.kcal) }} ккал
         </p>
+        <p v-if="averages.bingeDays" class="mt-3 flex items-center gap-1.5 text-xs text-muted">
+          <span class="w-1.5 h-1.5 rounded-full bg-binge" />Зажоров: {{ averages.bingeDays }} — в средние не вошли
+        </p>
         <p v-if="averages.totalDifferenceKcal !== null" class="mt-3 pt-3 border-t border-line text-sm text-ink flex justify-between">
           <span>Итого разница за период</span>
           <span class="font-semibold tabular-nums">{{ signed(averages.totalDifferenceKcal) }} ккал</span>
         </p>
         <p v-else class="mt-3 text-xs text-muted">Потрачено и разница считаются, когда в настройках задана цель (там энергия покоя).</p>
       </template>
-      <p v-else class="text-sm text-muted">За этот период нет законченных дней с записями.</p>
+      <p v-else class="text-sm text-muted">
+        За этот период нет законченных дней с записями.
+        <template v-if="averages.bingeDays">Зажоров: {{ averages.bingeDays }}.</template>
+      </p>
     </section>
 
     <p class="text-xs text-muted px-1 -mb-1">
       <template v-if="selected">
         <span class="text-ink font-medium">{{ capitalizeFirst(formatDateWithWeekday(selected)) }}</span>
+        <template v-if="selectedBinge"> · <span class="text-binge font-medium">зажор</span></template>
         · ещё тап — открыть день
       </template>
       <template v-else-if="kind === 'week'">Тап по дню — выделить, ещё тап — открыть день</template>
